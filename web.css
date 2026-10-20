@@ -11,7 +11,7 @@ body { position: fixed; inset: 0; -webkit-text-size-adjust: 100%; }
 input, textarea, select { font-size: 16px !important; }   /* sotto i 16px Safari ingrandisce la pagina */
 
 /* ---------- Home ---------- */
-.w-home { position: absolute; inset: 0; display: flex; flex-direction: column; gap: 14px;
+.w-home { position: absolute; inset: 0; overflow-x: hidden; display: flex; flex-direction: column; gap: 14px;
   padding: calc(var(--safe-t) + 22px) 18px calc(var(--safe-b) + 14px); overflow-y: auto; }
 .w-top { padding: 0 4px; }
 .w-greeting { font-family: var(--thin); font-weight: 100; font-size: 40px; line-height: 1.1; letter-spacing: -.5px; }
@@ -41,7 +41,7 @@ input, textarea, select { font-size: 16px !important; }   /* sotto i 16px Safari
 .toast { bottom: calc(var(--safe-b) + 70px); max-width: 90vw; white-space: normal; text-align: center; }
 
 /* ---------- Sezioni: schermo stretto ---------- */
-.section { padding: calc(var(--safe-t) + 10px) 12px calc(var(--safe-b) + 8px); gap: 10px; overflow-y: auto; }
+.section { padding: calc(var(--safe-t) + 10px) 12px calc(var(--safe-b) + 8px); gap: 10px; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; }
 .sec-head { flex-wrap: wrap; gap: 8px 10px; }
 .sec-head h1 { font-size: 30px; }
 .sec-sub { font-size: 13px; }
@@ -86,3 +86,7 @@ input, textarea, select { font-size: 16px !important; }   /* sotto i 16px Safari
 .ds-cat-name { font-size: 17px; }
 .ds-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .ds-tile { min-width: 0; }
+
+/* Lo schermo non scorre mai di lato: scorrono solo le file di schede (che sono contenitori a sé) */
+html, body { overflow: hidden; max-width: 100vw; touch-action: pan-y; }
+.glow { max-width: 100vw; }

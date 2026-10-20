@@ -452,7 +452,7 @@ body.focusing .zone[data-zone="relax"] { opacity: .32; }
 
 /* Dispensa: griglia 3×3 delle categorie, scelta della categoria e scanner */
 .ds-filters { flex-wrap: nowrap; }
-.ds-chips { display: flex; gap: 6px; overflow-x: auto; flex: 1 1 auto; min-width: 0; scrollbar-width: none; padding: 1px 0; }
+.ds-chips { display: flex; gap: 6px; overflow-x: auto; flex: 1 1 auto; min-width: 0; scrollbar-width: none; padding: 1px 0; position: relative; overscroll-behavior-x: contain; }
 .ds-chips::-webkit-scrollbar { display: none; }
 .ds-chip-b { display: flex; align-items: center; gap: 6px; white-space: nowrap; flex: none; }
 .ds-chip-b svg { width: 16px; height: 16px; color: var(--c); }

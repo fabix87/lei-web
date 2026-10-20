@@ -337,13 +337,14 @@
     // Schede: Tutti (griglia 3×3) e poi le nove categorie (elenco dei prodotti)
     const bar = h("div", "ds-filters");
     const chips = h("div", "ds-chips");
+    let activeChip = null;
     const chip = (label, active, fn, c) => {
       const b = h("button", "pill small ds-chip-b" + (active ? " on" : ""));
       if (c) { b.style.setProperty("--c", c.color); b.innerHTML = CAT.svg(c.icon); }
       b.appendChild(h("span", null, label));
       b.addEventListener("click", fn);
       chips.appendChild(b);
-      if (active) requestAnimationFrame(() => b.scrollIntoView({ block: "nearest", inline: "center" }));
+      if (active) activeChip = b;
     };
     chip("Tutti", !cat, () => { cat = null; render(); });
     CAT.LIST.forEach(c => chip(c.label, cat === c.id, () => { cat = c.id; render(); }, c));
@@ -356,6 +357,8 @@
     actions.append(scan, add);
     bar.append(chips, actions);
     ui.body.appendChild(bar);
+    // Centra la scheda scelta muovendo solo la fila delle schede (scrollIntoView sull'iPhone sposta tutta la pagina)
+    if (activeChip) chips.scrollLeft = activeChip.offsetLeft - (chips.clientWidth - activeChip.offsetWidth) / 2;
 
     if (!cat) { ui.body.appendChild(categoryGrid(data.products)); return; }
 
