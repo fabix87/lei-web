@@ -14,9 +14,8 @@ input, textarea, select { font-size: 16px !important; }   /* sotto i 16px Safari
 .w-home { position: absolute; inset: 0; display: flex; flex-direction: column; gap: 14px;
   padding: calc(var(--safe-t) + 22px) 18px calc(var(--safe-b) + 14px); overflow-y: auto; }
 .w-top { padding: 0 4px; }
-.w-greeting { color: var(--muted); font-size: 15px; letter-spacing: .02em; }
-.w-title { margin: 2px 0 0; font-family: var(--thin); font-weight: 100; font-size: 64px; line-height: 1; letter-spacing: -1px; }
-.w-date { color: var(--gold); font-size: 14px; letter-spacing: .04em; margin-top: 6px; }
+.w-greeting { font-family: var(--thin); font-weight: 100; font-size: 40px; line-height: 1.1; letter-spacing: -.5px; }
+.w-date { color: var(--gold); font-size: 15px; letter-spacing: .04em; margin-top: 8px; }
 .w-date::first-letter { text-transform: uppercase; }
 .w-wave { width: 100%; flex: 1 1 90px; min-height: 90px; max-height: 220px; }
 
