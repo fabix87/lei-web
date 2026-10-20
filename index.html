@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Lei</title>
+<!-- Aperta dall'icona sulla schermata Home: a tutto schermo, senza barre di Safari -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Lei">
+<meta name="theme-color" content="#08131C">
+<meta name="format-detection" content="telephone=no">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="scrittura.css">
+<link rel="stylesheet" href="collection.css">
+<link rel="stylesheet" href="web.css">
+</head>
+<body data-page="home">
+  <div class="glow g1"></div>
+  <div class="glow g2"></div>
+
+  <main class="w-home">
+    <header class="w-top">
+      <div class="w-greeting" id="greeting">Ciao</div>
+      <h1 class="w-title">Lei</h1>
+      <div class="w-date" id="date"></div>
+    </header>
+
+    <canvas id="wave" class="w-wave"></canvas>
+
+    <nav class="w-grid">
+      <button class="w-card" data-sec="dieta" data-icon="leaf"><span class="w-icon"></span><span class="w-name">Dieta</span><span class="w-sub">Pasti di oggi, peso</span></button>
+      <button class="w-card" data-sec="allenamento" data-icon="dumbbell"><span class="w-icon"></span><span class="w-name">Allenamento</span><span class="w-sub">Scheda del giorno</span></button>
+      <button class="w-card" id="tileDispensa" data-sec="dispensa" data-icon="box"><span class="w-icon"></span><span class="w-name">Dispensa</span><span class="w-sub tile-sub">Cosa c'è in casa</span></button>
+      <button class="w-card" id="tileSpesa" data-sec="dispensa" data-tab="spesa" data-icon="basket"><span class="w-icon"></span><span class="w-name">Lista spesa</span><span class="w-sub tile-sub">Dalla Dispensa</span></button>
+      <button class="w-card" data-sec="scrittura" data-icon="pen"><span class="w-icon"></span><span class="w-name">Scrittura</span><span class="w-sub">Capitoli e note</span></button>
+      <button class="w-card" data-sec="collection" data-icon="discs"><span class="w-icon"></span><span class="w-name">Collection</span><span class="w-sub">Libri, dischi, film, giochi</span></button>
+    </nav>
+
+    <footer class="w-sync">
+      <span class="w-sync-state" id="syncState"></span>
+      <button class="w-sync-btn" id="syncBtn"><span class="w-sync-icon"></span><span>Sincronizza</span></button>
+    </footer>
+  </main>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <script src="config.js"></script>
+  <script src="core.js"></script>
+  <script src="db.js"></script>
+  <script src="sync.js"></script>
+  <script src="sections.js"></script>
+  <script src="allenamento.js"></script>
+  <script src="dieta.js"></script>
+  <script src="scrittura.js"></script>
+  <script src="categorie.js"></script>
+  <script src="dispensa.js"></script>
+  <script src="zxing.min.js"></script>
+  <script src="collection.js"></script>
+</body>
+</html>

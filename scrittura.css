@@ -1,0 +1,95 @@
+/* ---------- Sezione Scrittura ---------- */
+.sc-body { flex: 1; min-height: 0; display: grid; gap: 12px; }
+.sc-scrivi { grid-template-columns: 230px 1fr 300px; }
+.sc-scrivi.no-notes { grid-template-columns: 230px 1fr; }
+.sc-mondo { grid-template-columns: 230px 1fr; }
+.sc-body.sc-note { grid-template-columns: 1fr 1.4fr; }
+.sc-aperti { grid-template-columns: 1.8fr 1fr; }
+.sc-body textarea, .sc-body input { user-select: text; -webkit-user-select: text; }
+
+/* Elenco dei capitoli */
+.sc-list, .sc-topics { overflow-y: auto; padding: 8px 8px 12px; display: flex; flex-direction: column; gap: 2px; }
+.sc-act { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .2em; padding: 10px 8px 4px; }
+.sc-ch { display: grid; grid-template-columns: 26px 1fr auto; gap: 8px; align-items: baseline; text-align: left; padding: 8px; border-radius: 12px; font-size: 14px; }
+.sc-ch-n { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.sc-ch-t { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sc-ch-w { color: var(--teal); font-size: 11px; }
+.sc-ch.on, .sc-topic.on { background: var(--gold-soft); color: var(--gold); }
+.sc-ch.on .sc-ch-n { color: var(--gold); }
+.sc-topic { text-align: left; padding: 11px 12px; border-radius: 12px; font-size: 15px; }
+
+/* Foglio */
+.sc-editor { display: flex; flex-direction: column; gap: 10px; min-height: 0; padding: 14px 18px 12px; }
+.sc-ed-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.sc-ed-n { color: var(--gold); font-size: 12px; letter-spacing: .06em; }
+.sc-ed-title { margin: 2px 0 0; font-family: var(--thin); font-weight: 100; font-size: 30px; line-height: 1.15; }
+.sc-text { flex: 1; min-height: 0; resize: none; width: 100%; box-sizing: border-box; background: rgba(8,19,28,.45); border: 1px solid var(--line);
+  border-radius: 14px; padding: 16px 20px; color: var(--text); font-family: serif; font-size: 18px; line-height: 1.65; outline: none; }
+.sc-text:focus { border-color: rgba(242,198,109,.45); }
+.sc-text::placeholder { color: var(--muted); opacity: .6; font-style: italic; }
+.sc-ed-foot { display: flex; align-items: center; gap: 12px; font-size: 13px; }
+.sc-words { color: var(--gold); }
+.sc-state { color: var(--muted); }
+.sc-gap { flex: 1; }
+
+/* Appunti del capitolo e colonne laterali */
+.sc-side { overflow-y: auto; padding: 14px 16px; }
+.sc-side .zone-h, .sc-page .zone-h { margin-top: 16px; }
+.sc-side .zone-h:first-child { margin-top: 0; }
+.sc-bul { margin: 0; padding-left: 18px; font-size: 14px; line-height: 1.5; }
+.sc-bul li { margin: 0 0 6px; }
+.sc-bul li::marker { color: var(--gold); }
+.sc-arc { font-size: 13px; line-height: 1.45; color: var(--muted); margin: 6px 0; }
+.sc-arc b { color: var(--teal); font-weight: 400; }
+.sc-open { font-size: 14px; line-height: 1.45; margin: 0; color: var(--gold); }
+.sc-mynote { font-size: 14px; line-height: 1.45; margin: 0 0 6px; padding: 8px 10px; border-radius: 10px; background: rgba(8,19,28,.5); }
+.sc-quick { display: flex; gap: 6px; margin-top: 6px; }
+.sc-quick .field { flex: 1; font-size: 14px; padding: 8px 10px; }
+.sc-rule { margin: 18px 0 0; font-size: 12px; color: var(--muted); font-style: italic; line-height: 1.45; }
+
+/* Il mondo */
+.sc-page { overflow-y: auto; padding: 16px 22px 20px; }
+.sc-page-title { margin: 0 0 8px; font-family: var(--thin); font-weight: 100; font-size: 32px; }
+.sc-thesis { font-size: 17px; line-height: 1.5; margin: 0 0 6px; }
+.sc-motto { font-family: serif; font-style: italic; color: var(--gold); font-size: 17px; margin: 0 0 6px; }
+.sc-factions { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 14px; }
+.sc-faction { background: rgba(8,19,28,.5); border: 1px solid var(--line); border-radius: 14px; padding: 12px; text-align: center; }
+.sc-emblem { width: 92px; height: 92px; margin: 0 auto 8px; color: var(--gold); }
+.sc-emblem svg { width: 100%; height: 100%; }
+.sc-f-name { font-size: 15px; }
+.sc-f-em { color: var(--teal); font-size: 12px; margin: 2px 0 6px; }
+.sc-f-txt { color: var(--muted); font-size: 12px; line-height: 1.4; }
+.sc-swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+.sc-swatch { display: flex; align-items: center; gap: 8px; padding: 6px 12px 6px 6px; border-radius: 999px; background: rgba(8,19,28,.5); border: 1px solid var(--line); font-size: 13px; }
+.sc-chip { width: 22px; height: 22px; border-radius: 50%; }
+.sc-hex { color: var(--muted); font-size: 11px; }
+
+/* Note */
+.sc-note-form { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; }
+.sc-note-text { flex: 1; min-height: 120px; resize: none; font-family: serif; font-size: 16px; line-height: 1.5; }
+.sc-note-form .pill.primary { align-self: flex-end; }
+.sc-note-list { overflow-y: auto; padding: 14px 16px; }
+.sc-note-list .sc-note { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; padding: 10px 0; border-top: 1px solid var(--line); }
+.sc-note-body { font-size: 15px; line-height: 1.45; white-space: pre-wrap; }
+.sc-note-meta { grid-column: 1; color: var(--muted); font-size: 12px; }
+.sc-del { grid-column: 2; grid-row: 1 / span 2; align-self: center; color: var(--muted); font-size: 13px; padding: 6px 10px; border-radius: 999px; }
+.sc-del.ask { color: #F0A08A; border: 1px solid rgba(240,160,138,.5); }
+
+/* Da decidere */
+.sc-open-item { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
+.sc-open-t { font-size: 15px; }
+.sc-open-n { color: var(--muted); font-size: 13px; line-height: 1.45; margin-top: 2px; }
+
+@media (orientation: portrait) {
+  .sc-scrivi, .sc-scrivi.no-notes { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; }
+  .sc-list { flex-direction: row; overflow-x: auto; overflow-y: hidden; padding: 6px; }
+  .sc-act { display: none; }
+  .sc-ch { grid-template-columns: auto; min-width: 54px; text-align: center; }
+  .sc-ch-t, .sc-ch-w { display: none; }
+  .sc-scrivi .sc-side { max-height: 30vh; }
+  .sc-mondo { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+  .sc-topics { flex-direction: row; overflow-x: auto; }
+  .sc-topic { white-space: nowrap; }
+  .sc-body.sc-note, .sc-aperti { grid-template-columns: 1fr; }
+  .sc-factions { grid-template-columns: repeat(2, 1fr); }
+}
