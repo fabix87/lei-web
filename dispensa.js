@@ -24,12 +24,21 @@
   const SHOP = "shopping_items?deleted_at=is.null&select=id,name,amount,done,source,created_at&order=created_at";
   const SOURCE_LABEL = { mano: "", ricetta: "per le ricette", finito: "finito", scaduto: "scaduto" };
   let root = null, ui = {}, data = null, tab = "prodotti", zone = null, onlySoon = false, photos = {};
+  let cat = null;            // categoria aperta (null = griglia 3×3 delle categorie)
+  let hasCategory = true;    // l'archivio ha la colonna products.category (08_categoria_prodotti.sql)
+  const catOf = p => CAT.categoryOf(p.name, p.location, p.category);
 
   // ---------- Dati ----------
   async function loadAll(cacheOnly) {
     const get = path => (cacheOnly ? DB.peek(path) : DB.load(path));
-    const [products, blocks, variants] = await Promise.all([
-      get("products?deleted_at=is.null&select=id,name,quantity,unit,location,expiry_date,image_path&order=name"),
+    // La colonna "category" arriva con 08_categoria_prodotti.sql: finché manca si legge senza
+    const prodPath = cols => `products?deleted_at=is.null&select=id,name,quantity,unit,location,expiry_date,image_path,barcode${cols}&order=name`;
+    const products = await get(prodPath(",category")).then(r => { if (!cacheOnly) hasCategory = true; return r; }, e => {
+      if (e.status === 400) hasCategory = false;
+      else if (!cacheOnly) throw e;
+      return get(prodPath(""));
+    });
+    const [blocks, variants] = await Promise.all([
       get("plan_blocks?type=eq.meal&select=day,id,time,title&order=position"),
       get("meal_variants?select=day,meal_id,position,title,description,ingredients&order=position")
     ]);
@@ -119,9 +128,15 @@
   }
 
   // ---------- Salvataggi (arrivano all'iPhone alla prossima apertura dell'app) ----------
+  // Senza la colonna nell'archivio la categoria scelta a mano non si salva (la riga verrebbe rifiutata)
+  function forDB(values) {
+    const v = Object.assign({}, values);
+    if (!hasCategory) delete v.category;
+    return v;
+  }
   function saveProduct(p, values) {
     Object.assign(p, values);
-    DB.update("products", `id=eq.${p.id}`, values);
+    DB.update("products", `id=eq.${p.id}`, forDB(values));
     render();
   }
   function removeProduct(p) {
@@ -133,9 +148,52 @@
   function addProduct(row) {
     data.products.push(Object.assign({ id: null, image_path: null }, row));
     data.products.sort((a, b) => norm(a.name).localeCompare(norm(b.name)));
-    DB.insert("products", row).then(refresh);
+    DB.insert("products", forDB(row)).then(refresh);
     closeSheet();
     render();
+  }
+
+  // ---------- Codice a barre: Open Food Facts (archivio libero e gratuito, senza chiave) ----------
+  async function lookupBarcode(code) {
+    try {
+      const r = await fetch(`https://world.openfoodfacts.org/api/v2/product/${code}.json?fields=product_name_it,product_name,generic_name_it,brands,categories_tags`);
+      if (!r.ok) return null;
+      const j = await r.json();
+      const pr = j && j.status === 1 && j.product;
+      if (!pr) return null;
+      let name = (pr.product_name_it || pr.product_name || pr.generic_name_it || "").trim();
+      const brand = String(pr.brands || "").split(",")[0].trim();
+      if (!name) return null;
+      if (brand && !norm(name).includes(norm(brand))) name += " " + brand;
+      const category = CAT.fromTags(pr.categories_tags) || CAT.guess(name);
+      return { name, category, location: category ? CAT.placeFor(category) : "dispensa" };
+    } catch (e) { return null; }
+  }
+
+  function openScan() {
+    window.LeiScanner.open({
+      hint: "Inquadra il codice a barre del prodotto",
+      onManual: () => openSheet(null),
+      onCode: async (code, o) => {
+        const existing = data.products.find(p => p.barcode === code);
+        if (existing) {
+          if (!o.burst) { openSheet(existing, null, "Ce l'hai già: aggiorna la quantità"); return null; }
+          if (existing.id === null) return { text: `${existing.name} · in invio, riprova tra poco`, cls: "dup" };
+          saveProduct(existing, { quantity: Math.round((Number(existing.quantity) + STEP[existing.unit]) * 100) / 100 });
+          return { text: `${existing.name} · ora ${qty(existing.quantity, existing.unit)}`, cls: "dup" };
+        }
+        if (!o.burst) K.toast("Cerco " + code + "…");
+        const found = await lookupBarcode(code);
+        if (!o.burst) {
+          openSheet(null, Object.assign({ barcode: code }, found || {}),
+            found ? "Trovato online: controlla e aggiungi" : "Non l'ho trovato online: scrivi tu il nome");
+          return null;
+        }
+        if (!found) return { text: `${code} · non trovato: aggiungilo a mano`, cls: "todo" };
+        addProduct({ name: found.name, quantity: 1, unit: "pz", location: found.location, expiry_date: null, category: found.category || null, barcode: code });
+        return { text: `${found.name} · aggiunto`, cls: "ok" };
+      }
+    });
   }
 
   // ---------- Interfaccia ----------
@@ -194,13 +252,27 @@
     chip("Tutti", !zone, () => { zone = null; render(); });
     ZONES.forEach(([id, label]) => chip(label, zone === id, () => { zone = id; render(); }));
     chip("In scadenza", onlySoon, () => { onlySoon = !onlySoon; render(); });
+    const scan = h("button", "pill ds-scan");
+    scan.innerHTML = CAT.svg("barcode") + "<span>Scansiona</span>";
+    scan.addEventListener("click", openScan);
     const add = h("button", "pill primary ds-add", "+ Aggiungi");
     add.addEventListener("click", () => openSheet(null));
-    bar.appendChild(add);
+    bar.append(scan, add);
     ui.body.appendChild(bar);
 
-    const list = data.products
-      .filter(p => (!zone || p.location === zone) && (!onlySoon || expiryClass(p)))
+    const filtered = data.products.filter(p => (!zone || p.location === zone) && (!onlySoon || expiryClass(p)));
+    if (!cat) { ui.body.appendChild(categoryGrid(filtered)); return; }
+
+    // Dentro una categoria: titolo con il ritorno alla griglia
+    const c = CAT.LIST.find(x => x.id === cat);
+    const back = h("button", "ds-cat-back");
+    back.innerHTML = `<span class="ds-cat-arrow">‹</span>${CAT.svg(c.icon)}<span>${c.label}</span>`;
+    back.style.color = c.color;
+    back.addEventListener("click", () => { cat = null; render(); });
+    ui.body.appendChild(back);
+
+    const list = filtered
+      .filter(p => catOf(p).id === cat)
       .sort((a, b) => {
         const da = daysLeft(a), db = daysLeft(b);
         if (da === null && db === null) return norm(a.name).localeCompare(norm(b.name));
@@ -209,16 +281,34 @@
         return da - db;
       });
     if (!list.length) {
-      ui.body.appendChild(h("div", "sec-empty", data.products.length ? "Nessun prodotto con questi filtri." : "La dispensa è vuota: aggiungi i prodotti dall'iPhone o con + Aggiungi."));
+      ui.body.appendChild(h("div", "sec-empty", "Nessun prodotto in questa categoria" + (zone || onlySoon ? " con questi filtri." : ": aggiungilo con Scansiona o + Aggiungi.")));
       return;
     }
-    // "Tutti": griglia con l'icona della categoria (come nell'app dell'iPhone).
-    // Zona scelta: elenco con foto e dettagli.
+    // "Tutti": riquadri con l'icona. Zona scelta: elenco con foto e dettagli.
     ui.body.appendChild(zone ? productList(list) : productTiles(list));
   }
 
+  // Griglia 3×3 delle categorie: quanti prodotti ci sono e quanti stanno per scadere
+  function categoryGrid(list) {
+    const grid = h("div", "ds-cats");
+    CAT.LIST.forEach(c => {
+      const items = list.filter(p => catOf(p).id === c.id);
+      const urgent = items.filter(p => expiryClass(p)).length;
+      const b = h("button", "ds-cat-cell" + (items.length ? "" : " empty") + (urgent ? " soon" : ""));
+      const ic = h("div", "ds-ic");
+      ic.style.color = c.color;
+      ic.style.background = c.color + "22";
+      ic.innerHTML = CAT.svg(c.icon);
+      b.append(ic, h("div", "ds-cat-name", c.label), h("div", "ds-cat-count", items.length ? `${items.length} ${items.length === 1 ? "prodotto" : "prodotti"}` : "vuota"));
+      if (urgent) b.appendChild(h("span", "ds-badge ds-cat-badge", `${urgent} in scadenza`));
+      b.addEventListener("click", () => { cat = c.id; render(); });
+      grid.appendChild(b);
+    });
+    return grid;
+  }
+
   function categoryIcon(p, cls) {
-    const c = CAT.categoryOf(p.name, p.location);
+    const c = catOf(p);
     const ic = h("div", "ds-ic " + (cls || ""));
     ic.style.color = c.color;
     ic.style.background = c.color + "22";
@@ -254,7 +344,7 @@
   function productList(list) {
     const box = h("div", "ds-list");
     list.forEach(p => {
-      const c = CAT.categoryOf(p.name, p.location);
+      const c = catOf(p);
       const r = h("button", "card ds-row " + expiryClass(p));
       const info = h("div", "ds-info");
       const cat = h("div", "ds-cat", c.label);
@@ -320,9 +410,12 @@
 
   // ---------- Scheda prodotto (modifica o nuovo) ----------
   function closeSheet() { ui.sheet.hidden = true; ui.sheet.innerHTML = ""; }
-  function openSheet(p) {
+  // prefill: dati già noti per un prodotto nuovo (dal codice a barre); note: riga di spiegazione in alto
+  function openSheet(p, prefill, note) {
     const isNew = !p;
-    const draft = isNew ? { name: "", quantity: 1, unit: "pz", location: zone || "dispensa", expiry_date: null } : { quantity: Number(p.quantity), unit: p.unit, location: p.location, expiry_date: p.expiry_date };
+    const draft = isNew
+      ? Object.assign({ name: "", quantity: 1, unit: "pz", location: zone || (cat ? CAT.placeFor(cat) : "dispensa"), expiry_date: null, category: cat, barcode: null }, prefill || {})
+      : { quantity: Number(p.quantity), unit: p.unit, location: p.location, expiry_date: p.expiry_date, category: p.category || null };
     ui.sheet.innerHTML = "";
     const box = h("div", "sheet-box ds-box");
     const head = h("div", "ds-box-head");
@@ -330,6 +423,7 @@
     const title = h("div");
     title.appendChild(h("h3", null, isNew ? "Nuovo prodotto" : p.name));
     if (!isNew && p.id === null) title.appendChild(h("p", null, "In invio all'archivio…"));
+    if (note) title.appendChild(h("p", "ds-note-line", note));
     head.appendChild(title);
     box.appendChild(head);
 
@@ -337,8 +431,31 @@
     if (isNew) {
       nameIn = h("input", "field");
       nameIn.placeholder = "Nome (es. Pasta Barilla)";
+      nameIn.value = draft.name;
+      nameIn.addEventListener("input", () => { draft.name = nameIn.value; paintCats(); });
       box.appendChild(nameIn);
     }
+
+    // Categoria: quella scelta a mano, altrimenti quella capita dal nome (segnata come "auto")
+    const cats = h("div", "ds-catpick");
+    const currentCat = () => draft.category || CAT.categoryOf(isNew ? draft.name : p.name, draft.location).id;
+    function paintCats() {
+      const cur = currentCat();
+      cats.querySelectorAll("button").forEach(b => {
+        b.classList.toggle("on", b.dataset.cat === cur);
+        b.classList.toggle("auto", b.dataset.cat === cur && !draft.category);
+      });
+    }
+    CAT.LIST.forEach(c => {
+      const b = h("button", "ds-catpick-b");
+      b.dataset.cat = c.id;
+      b.style.setProperty("--c", c.color);
+      b.innerHTML = CAT.svg(c.icon) + `<span>${c.label}</span>`;
+      b.addEventListener("click", () => { draft.category = c.id; paintCats(); });
+      cats.appendChild(b);
+    });
+    box.appendChild(cats);
+    paintCats();
     // Quantità con −/+
     const qRow = h("div", "ds-qrow");
     const minus = h("button", "dt-en", "−"), plus = h("button", "dt-en", "+");
@@ -359,7 +476,7 @@
     const zones = h("div", "ds-zones");
     ZONES.forEach(([id, label]) => {
       const b = h("button", "pill small" + (draft.location === id ? " on" : ""), label);
-      b.addEventListener("click", () => { draft.location = id; zones.querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b)); });
+      b.addEventListener("click", () => { draft.location = id; zones.querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b)); paintCats(); });
       zones.appendChild(b);
     });
     box.appendChild(zones);
@@ -382,10 +499,10 @@
       if (isNew) {
         const name = nameIn.value.trim();
         if (!name) return K.toast("Scrivi il nome del prodotto");
-        addProduct({ name, quantity: draft.quantity, unit: draft.unit, location: draft.location, expiry_date: draft.expiry_date });
+        addProduct({ name, quantity: draft.quantity, unit: draft.unit, location: draft.location, expiry_date: draft.expiry_date, category: draft.category || null, barcode: draft.barcode || null });
       } else {
         if (p.id === null) return K.toast("Aspetta che il prodotto arrivi all'archivio");
-        saveProduct(p, { quantity: draft.quantity, unit: draft.unit, location: draft.location, expiry_date: draft.expiry_date });
+        saveProduct(p, { quantity: draft.quantity, unit: draft.unit, location: draft.location, expiry_date: draft.expiry_date, category: draft.category || null });
         closeSheet();
       }
     });
@@ -526,6 +643,7 @@
     open(el, opts) {
       root = el;
       tab = opts && opts.tab ? opts.tab : "prodotti";
+      cat = null;
       build(el);
       if (data) { render(); loadPhotos(); }
       else {
@@ -535,10 +653,18 @@
       refresh();
     },
     close() {
+      window.LeiScanner.close();
       root = null;
       document.activeElement && document.activeElement.blur && document.activeElement.blur();
       DB.flush();
       renderTiles(false);
+    },
+    // Back: prima lo scanner, poi la scheda, poi dalla categoria alla griglia
+    back() {
+      if (window.LeiScanner.close()) return true;
+      if (ui.sheet && !ui.sheet.hidden) { closeSheet(); return true; }
+      if (tab === "prodotti" && cat) { cat = null; render(); return true; }
+      return false;
     },
     sync() { if (root && ui.sync) S.syncLabel(ui.sync); }
   });

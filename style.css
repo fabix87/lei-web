@@ -450,6 +450,34 @@ body.focusing .zone[data-zone="relax"] { opacity: .32; }
   .ds-list { grid-template-columns: 1fr; }
 }
 
+/* Dispensa: griglia 3×3 delle categorie, scelta della categoria e scanner */
+.ds-scan { margin-left: auto; display: flex; align-items: center; gap: 8px; padding: 8px 16px; font-size: 14px; }
+.ds-scan svg { width: 18px; height: 18px; color: var(--gold); }
+.ds-filters .ds-add { margin-left: 0; }
+.ds-cats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; width: min(100%, calc(100vh - 240px)); margin: 0 auto; align-content: start; }
+.ds-cat-cell { aspect-ratio: 1; position: relative; background: var(--card); border: 1px solid var(--line); border-radius: 22px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 8px; text-align: center; min-width: 0; }
+.ds-cat-cell:active { background: var(--card-press); }
+.ds-cat-cell .ds-ic { width: 48%; height: auto; aspect-ratio: 1; max-width: 76px; border-radius: 30%; margin-bottom: 4px; }
+.ds-cat-cell .ds-ic > svg { width: 56%; height: 56%; }
+.ds-cat-cell.empty { opacity: .55; }
+.ds-cat-cell.soon { border-color: rgba(242,198,109,.55); }
+.ds-cat-name { font-size: 15px; }
+.ds-cat-count { font-size: 11px; color: var(--muted); }
+.ds-cat-badge { position: absolute; top: 8px; right: 8px; font-size: 10px; }
+.ds-cat-back { display: flex; align-items: center; gap: 8px; align-self: flex-start; font-family: var(--thin); font-weight: 100; font-size: 26px; padding: 2px 4px; }
+.ds-cat-back svg { width: 26px; height: 26px; }
+.ds-cat-back span { color: var(--text); }
+.ds-cat-back .ds-cat-arrow { color: var(--muted); font-size: 30px; margin-right: 2px; }
+.ds-catpick { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.ds-catpick-b { display: flex; align-items: center; gap: 6px; padding: 7px 8px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); font-size: 12px; color: var(--muted); min-width: 0; }
+.ds-catpick-b svg { width: 18px; height: 18px; flex: none; color: var(--c); }
+.ds-catpick-b span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ds-catpick-b.on { color: var(--text); border-color: var(--c); background: var(--card-press); }
+.ds-catpick-b.on.auto { border-style: dashed; }
+.ds-note-line { color: var(--gold) !important; }
+.lei-scan { position: fixed; z-index: 60; }
+
 /* Dispensa: lista della spesa */
 .ds-spesa { display: grid; grid-template-columns: 1.6fr 1fr; gap: 12px; }
 .sp-main { overflow-y: auto; padding: 12px 16px; min-height: 0; }

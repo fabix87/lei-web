@@ -65,3 +65,13 @@ input, textarea, select { font-size: 16px !important; }   /* sotto i 16px Safari
 .wk-day .wk-n { font-size: 22px; }
 .wk-day .wk-d, .wk-day .wk-t { font-size: 10px; letter-spacing: .04em; }
 .wk-nav { grid-column: 1 / -1; flex-direction: row; justify-content: center; }
+
+/* Scanner a tutto schermo: lontano dalla tacca e dalla barra in basso dell'iPhone */
+.col-scan-top { top: calc(var(--safe-t) + 12px); left: 14px; right: 14px; }
+.col-scan-hint { font-size: 20px; }
+.col-scan-bottom { bottom: calc(var(--safe-b) + 12px); left: 12px; right: 12px; }
+.col-scan-input { width: 100%; }
+
+/* Dispensa: la griglia 3×3 occupa tutta la larghezza */
+.ds-cats { width: 100%; gap: 8px; }
+.ds-filters .pill.small { padding: 6px 12px; }
