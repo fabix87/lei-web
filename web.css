@@ -54,7 +54,7 @@ input, textarea, select { font-size: 16px !important; }   /* sotto i 16px Safari
 .pill.primary { min-width: 0; }
 
 /* Le colonne delle griglie non devono allargarsi oltre lo schermo per colpa di un campo */
-.dt-oggi > *, .dt-progressi > *, .wk-body > *, .ds-body > *, .ds-ricette > * { min-width: 0; }
+.dt-oggi > *, .dt-progressi > *, .wk-body > *, .ds-body > *, .ds-ricette > *, .ds-fattibili > * { min-width: 0; }
 .dt-form { flex-wrap: wrap; }
 .dt-form .field { min-width: 0; }
 .dt-form input[type=date] { flex: 1 1 100%; }
@@ -90,3 +90,4 @@ input, textarea, select { font-size: 16px !important; }   /* sotto i 16px Safari
 /* Lo schermo non scorre mai di lato: scorrono solo le file di schede (che sono contenitori a sé) */
 html, body { overflow: hidden; max-width: 100vw; touch-action: pan-y; }
 .glow { max-width: 100vw; }
+.sec-tabs .pill { white-space: nowrap; flex: none; padding: 7px 13px; }

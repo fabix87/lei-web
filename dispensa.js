@@ -109,10 +109,25 @@
 
   // ---------- Ricette possibili ----------
   // Un ingrediente c'è se il nome di un prodotto lo contiene (es. "pasta" → "Pasta Barilla")
+  // Ingredienti generici delle ricette: valgono tutti i prodotti della categoria ("pesce" → merluzzo, salmone…)
+  const GENERIC = { pesce: "pesce", carne: "carne", verdure: "verdura", verdura: "verdura", frutta: "frutta", frutto: "frutta" };
+  // Nomi che coprono un ingrediente ("pasta" → spaghetti, penne…)
+  const SYNONYMS = {
+    pasta: ["spaghetti", "penne", "fusilli", "rigatoni", "maccheroni", "linguine", "tagliatelle", "farfalle", "orecchiette", "paccheri", "bucatini", "trofie", "ditalini", "mezze", "sedani", "conchiglie", "tortiglioni", "casarecce"],
+    insalata: ["lattuga", "rucola", "valeriana", "songino", "iceberg", "misticanza", "radicchio", "gentilina", "trocadero"],
+    pane: ["pancarre", "panino", "panini", "baguette", "rosetta", "ciabatta", "filone"],
+    legumi: ["fagioli", "ceci", "lenticchie", "piselli", "fave"],
+    pomodoro: ["pomodori", "pomodorini", "pelati", "passata", "polpa"]
+  };
+  // Parola uguale, o stessa radice con desinenza diversa (zucchina/zucchine), non una parola più lunga (pane ≠ pangrattato)
+  const sameWord = (t, w) => t === w || (w.length > 3 && t.length <= w.length + 2 && t.slice(0, w.length - 1) === w.slice(0, -1));
   function matchIngredient(ing) {
     const w = norm(ing);
     if (STAPLES.includes(w)) return { ok: true, staple: true, products: [] };
-    const found = data.products.filter(p => Number(p.quantity) > 0 && norm(p.name).split(/[^a-z]+/).some(t => t === w || (w.length > 3 && t.startsWith(w.slice(0, -1)))));
+    const words = [w].concat(SYNONYMS[w] || []);
+    const found = data.products.filter(p => Number(p.quantity) > 0 && (
+      (GENERIC[w] && catOf(p).id === GENERIC[w]) ||
+      norm(p.name).split(/[^a-z]+/).some(t => words.some(x => sameWord(t, x)))));
     return { ok: found.length > 0, products: found };
   }
   function evaluate(variant) {
@@ -371,7 +386,7 @@
     ui.sub = head.querySelector(".sec-sub");
     ui.sync = head.querySelector(".sec-sync");
     ui.tabs = h("div", "sec-tabs");
-    [["prodotti", "Prodotti"], ["ricette", "Ricette possibili"], ["spesa", "Lista spesa"]].forEach(([id, label]) => {
+    [["prodotti", "Prodotti"], ["ricette", "Ricette possibili"], ["fattibili", "Fattibili"], ["spesa", "Lista spesa"]].forEach(([id, label]) => {
       const b = h("button", "pill small" + (id === tab ? " on" : ""), label);
       b.dataset.tab = id;
       b.addEventListener("click", () => { tab = id; render(); });
@@ -395,6 +410,7 @@
     ui.body.className = "ds-body ds-" + tab;
     if (tab === "prodotti") renderProducts();
     else if (tab === "ricette") renderRecipes();
+    else if (tab === "fattibili") renderDoable();
     else renderShopping();
   }
 
@@ -548,8 +564,74 @@
     const ings = h("div", "ds-ings");
     [...shop].sort().forEach(i => ings.appendChild(h("span", "ds-ing miss", i)));
     c2.appendChild(ings);
-    c2.appendChild(h("div", "wk-hint ds-note", "Gli ingredienti sono confrontati con i nomi dei prodotti: \"pesce\" non riconosce \"merluzzo\"."));
+    c2.appendChild(h("div", "wk-hint ds-note", "Gli ingredienti sono confrontati con i nomi dei prodotti; \"pesce\", \"carne\", \"verdure\" e \"frutta\" valgono per tutta la categoria."));
     side.append(c1, c2);
+  }
+
+  // ---------- Fattibili: le ricette del piano Dieta che si fanno solo con quello che c'è in casa ----------
+  const MEAL_NAME = { colazione: "Colazione", pranzo: "Pranzo", spuntino: "Spuntino", cena: "Cena" };
+  const DAY_SHORT = { lun: "lun", mar: "mar", mer: "mer", gio: "gio", ven: "ven", sab: "sab", dom: "dom" };
+  function allRecipes() {
+    const byTitle = new Map();   // la stessa ricetta può stare in più giorni: una sola scheda con i giorni
+    Object.values(data.pools).forEach(pool => pool.forEach(v => {
+      if (!(v.ingredients || []).length) return;
+      const key = norm(v.title);
+      if (!byTitle.has(key)) byTitle.set(key, { variant: v, meal: v.meal_id, days: [] });
+      const r = byTitle.get(key);
+      if (!r.days.includes(v.day)) r.days.push(v.day);
+    }));
+    return [...byTitle.values()].map(r => Object.assign(r, evaluate(r.variant)));
+  }
+
+  function doableCard(r) {
+    const c = h("div", "card ds-recipe" + (r.miss.length ? "" : " ready") + (r.urgent.length ? " urgent" : ""));
+    const top = h("div", "ds-r-top");
+    const order = Object.keys(DAY_SHORT);
+    top.append(h("span", "ds-r-when", `${MEAL_NAME[r.meal] || r.meal} · nel piano ${r.days.sort((a, b) => order.indexOf(a) - order.indexOf(b)).map(d => DAY_SHORT[d]).join(", ")}`),
+      h("span", "ds-r-badge", r.miss.length ? `manca ${r.miss[0]}` : "hai tutto"));
+    c.append(top, h("div", "ds-r-title", r.variant.title.split("—").pop().trim()), h("div", "ds-r-desc", r.variant.description));
+    // Ogni ingrediente con il prodotto di casa che lo copre
+    const ing = h("div", "ds-ings");
+    (r.variant.ingredients || []).forEach(i => {
+      const m = matchIngredient(i);
+      const label = m.staple ? i : m.ok ? `${i}: ${m.products.slice(0, 2).map(p => p.name).join(", ")}` : i;
+      ing.appendChild(h("span", "ds-ing " + (m.ok ? "ok" : "miss"), label));
+    });
+    c.appendChild(ing);
+    if (r.urgent.length) c.appendChild(h("div", "ds-r-urgent", "Usa prima: " + r.urgent.map(p => `${p.name} (${expiryText(p)})`).join(", ")));
+    return c;
+  }
+
+  function renderDoable() {
+    const list = allRecipes();
+    const byUrgency = (a, b) => (b.urgent.length > 0) - (a.urgent.length > 0) || norm(a.variant.title).localeCompare(norm(b.variant.title));
+    const ok = list.filter(r => !r.miss.length).sort(byUrgency);
+    const almost = list.filter(r => r.miss.length === 1).sort(byUrgency);
+    const main = h("div", "ds-r-list"), side = h("div", "wk-side");
+    ui.body.append(main, side);
+    if (ok.length) ok.forEach(r => main.appendChild(doableCard(r)));
+    else main.appendChild(h("div", "sec-empty", list.length
+      ? "Con quello che hai in casa non c'è ancora una ricetta del piano completa. Guarda qui accanto quelle a cui manca un solo ingrediente."
+      : "Il piano Dieta non ha ancora ricette con gli ingredienti."));
+
+    // Colonna: ricette a cui manca un solo ingrediente, da aggiungere alla spesa con un tocco
+    const c = h("div", "card ds-side");
+    c.appendChild(h("h2", "zone-h", "Manca un ingrediente"));
+    if (!almost.length) c.appendChild(h("div", "wk-hint", "Nessuna."));
+    almost.forEach(r => {
+      const row = h("div", "ds-almost");
+      const t = h("div");
+      t.append(h("div", "ds-almost-t", r.variant.title.split("—").pop().trim()), h("div", "wk-hint", "manca: " + r.miss[0]));
+      row.appendChild(t);
+      if (data.shopping && !inList(r.miss[0])) {
+        const b = h("button", "pill small", "+ spesa");
+        b.addEventListener("click", () => { addItem(r.miss[0], "", "ricetta"); K.toast(`${r.miss[0]} aggiunto alla lista`); });
+        row.appendChild(b);
+      } else if (data.shopping) row.appendChild(h("span", "wk-hint", "in lista"));
+      c.appendChild(row);
+    });
+    c.appendChild(h("div", "wk-hint ds-note", "Olio, sale ed erbe si danno per scontati."));
+    side.appendChild(c);
   }
 
   // ---------- Scheda prodotto (modifica o nuovo) ----------
