@@ -75,3 +75,12 @@ input, textarea, select { font-size: 16px !important; }   /* sotto i 16px Safari
 /* Dispensa: la griglia 3×3 occupa tutta la larghezza */
 .ds-cats { width: 100%; gap: 8px; }
 .ds-filters .pill.small { padding: 6px 12px; }
+
+/* Dispensa sull'iPhone: schede che scorrono, pulsanti sotto, griglia 3×3 alta quanto lo schermo */
+.ds-filters { flex-direction: column; align-items: stretch; flex-wrap: nowrap; }
+.ds-actions .pill { flex: 1; justify-content: center; }
+.ds-prodotti .ds-cats { flex: 1; min-height: 0; grid-template-rows: repeat(3, minmax(0, 1fr)); }
+.ds-prodotti .ds-cat-cell { aspect-ratio: auto; gap: 8px; }
+.ds-cat-cell .ds-ic { width: 66%; max-width: 120px; border-radius: 28%; }
+.ds-cat-cell .ds-ic > svg { width: 64%; height: 64%; stroke-width: 1.7; }
+.ds-cat-name { font-size: 17px; }

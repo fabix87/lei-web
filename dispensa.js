@@ -23,7 +23,7 @@
 
   const SHOP = "shopping_items?deleted_at=is.null&select=id,name,amount,done,source,created_at&order=created_at";
   const SOURCE_LABEL = { mano: "", ricetta: "per le ricette", finito: "finito", scaduto: "scaduto" };
-  let root = null, ui = {}, data = null, tab = "prodotti", zone = null, onlySoon = false, photos = {};
+  let root = null, ui = {}, data = null, tab = "prodotti", photos = {};
   let cat = null;            // categoria aperta (null = griglia 3×3 delle categorie)
   let hasCategory = true;    // l'archivio ha la colonna products.category (08_categoria_prodotti.sql)
   const catOf = p => CAT.categoryOf(p.name, p.location, p.category);
@@ -247,31 +247,32 @@
   }
 
   function renderProducts() {
+    // Schede: Tutti (griglia 3×3) e poi le nove categorie (elenco dei prodotti)
     const bar = h("div", "ds-filters");
-    const chip = (label, active, fn) => { const b = h("button", "pill small" + (active ? " on" : ""), label); b.addEventListener("click", fn); bar.appendChild(b); };
-    chip("Tutti", !zone, () => { zone = null; render(); });
-    ZONES.forEach(([id, label]) => chip(label, zone === id, () => { zone = id; render(); }));
-    chip("In scadenza", onlySoon, () => { onlySoon = !onlySoon; render(); });
+    const chips = h("div", "ds-chips");
+    const chip = (label, active, fn, c) => {
+      const b = h("button", "pill small ds-chip-b" + (active ? " on" : ""));
+      if (c) { b.style.setProperty("--c", c.color); b.innerHTML = CAT.svg(c.icon); }
+      b.appendChild(h("span", null, label));
+      b.addEventListener("click", fn);
+      chips.appendChild(b);
+      if (active) requestAnimationFrame(() => b.scrollIntoView({ block: "nearest", inline: "center" }));
+    };
+    chip("Tutti", !cat, () => { cat = null; render(); });
+    CAT.LIST.forEach(c => chip(c.label, cat === c.id, () => { cat = c.id; render(); }, c));
+    const actions = h("div", "ds-actions");
     const scan = h("button", "pill ds-scan");
     scan.innerHTML = CAT.svg("barcode") + "<span>Scansiona</span>";
     scan.addEventListener("click", openScan);
     const add = h("button", "pill primary ds-add", "+ Aggiungi");
     add.addEventListener("click", () => openSheet(null));
-    bar.append(scan, add);
+    actions.append(scan, add);
+    bar.append(chips, actions);
     ui.body.appendChild(bar);
 
-    const filtered = data.products.filter(p => (!zone || p.location === zone) && (!onlySoon || expiryClass(p)));
-    if (!cat) { ui.body.appendChild(categoryGrid(filtered)); return; }
+    if (!cat) { ui.body.appendChild(categoryGrid(data.products)); return; }
 
-    // Dentro una categoria: titolo con il ritorno alla griglia
-    const c = CAT.LIST.find(x => x.id === cat);
-    const back = h("button", "ds-cat-back");
-    back.innerHTML = `<span class="ds-cat-arrow">‹</span>${CAT.svg(c.icon)}<span>${c.label}</span>`;
-    back.style.color = c.color;
-    back.addEventListener("click", () => { cat = null; render(); });
-    ui.body.appendChild(back);
-
-    const list = filtered
+    const list = data.products
       .filter(p => catOf(p).id === cat)
       .sort((a, b) => {
         const da = daysLeft(a), db = daysLeft(b);
@@ -281,14 +282,13 @@
         return da - db;
       });
     if (!list.length) {
-      ui.body.appendChild(h("div", "sec-empty", "Nessun prodotto in questa categoria" + (zone || onlySoon ? " con questi filtri." : ": aggiungilo con Scansiona o + Aggiungi.")));
+      ui.body.appendChild(h("div", "sec-empty", "Nessun prodotto in questa categoria: aggiungilo con Scansiona o + Aggiungi."));
       return;
     }
-    // "Tutti": riquadri con l'icona. Zona scelta: elenco con foto e dettagli.
-    ui.body.appendChild(zone ? productList(list) : productTiles(list));
+    ui.body.appendChild(productTiles(list));
   }
 
-  // Griglia 3×3 delle categorie: quanti prodotti ci sono e quanti stanno per scadere
+  // Griglia 3×3 delle categorie: l'etichetta dorata dice quanti prodotti stanno per scadere
   function categoryGrid(list) {
     const grid = h("div", "ds-cats");
     CAT.LIST.forEach(c => {
@@ -299,7 +299,7 @@
       ic.style.color = c.color;
       ic.style.background = c.color + "22";
       ic.innerHTML = CAT.svg(c.icon);
-      b.append(ic, h("div", "ds-cat-name", c.label), h("div", "ds-cat-count", items.length ? `${items.length} ${items.length === 1 ? "prodotto" : "prodotti"}` : "vuota"));
+      b.append(ic, h("div", "ds-cat-name", c.label));
       if (urgent) b.appendChild(h("span", "ds-badge ds-cat-badge", `${urgent} in scadenza`));
       b.addEventListener("click", () => { cat = c.id; render(); });
       grid.appendChild(b);
@@ -339,26 +339,6 @@
       grid.appendChild(t);
     });
     return grid;
-  }
-
-  function productList(list) {
-    const box = h("div", "ds-list");
-    list.forEach(p => {
-      const c = catOf(p);
-      const r = h("button", "card ds-row " + expiryClass(p));
-      const info = h("div", "ds-info");
-      const cat = h("div", "ds-cat", c.label);
-      cat.style.color = c.color;
-      info.append(cat, h("div", "ds-name", p.name));
-      const meta = h("div", "ds-meta");
-      meta.appendChild(h("span", "ds-chip", qty(p.quantity, p.unit)));
-      meta.appendChild(h("span", "ds-chip ds-exp", expiryText(p) || "senza scadenza"));
-      info.appendChild(meta);
-      r.append(p.image_path && photos[p.image_path] ? thumb(p, "photo") : categoryIcon(p, "photo"), info);
-      r.addEventListener("click", () => openSheet(p));
-      box.appendChild(r);
-    });
-    return box;
   }
 
   function recipeCard(item) {
@@ -414,7 +394,7 @@
   function openSheet(p, prefill, note) {
     const isNew = !p;
     const draft = isNew
-      ? Object.assign({ name: "", quantity: 1, unit: "pz", location: zone || (cat ? CAT.placeFor(cat) : "dispensa"), expiry_date: null, category: cat, barcode: null }, prefill || {})
+      ? Object.assign({ name: "", quantity: 1, unit: "pz", location: cat ? CAT.placeFor(cat) : "dispensa", expiry_date: null, category: cat, barcode: null }, prefill || {})
       : { quantity: Number(p.quantity), unit: p.unit, location: p.location, expiry_date: p.expiry_date, category: p.category || null };
     ui.sheet.innerHTML = "";
     const box = h("div", "sheet-box ds-box");
