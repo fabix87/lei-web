@@ -1043,5 +1043,6 @@
     sync() { if (root && ui.sync) S.syncLabel(ui.sync); }
   });
 
-  window.LeiCollection = { lookup, ocrCover };   // ocrCover: anche per le prove da console
+  // http: anche per la Dispensa (sul tablet passa dal ponte Java, senza i limiti CORS)
+  window.LeiCollection = { lookup, ocrCover, http };   // ocrCover: anche per le prove da console
 })();

@@ -25,19 +25,28 @@
   const SOURCE_LABEL = { mano: "", ricetta: "per le ricette", finito: "finito", scaduto: "scaduto" };
   let root = null, ui = {}, data = null, tab = "prodotti", photos = {};
   let cat = null;            // categoria aperta (null = griglia 3×3 delle categorie)
-  let hasCategory = true;    // l'archivio ha la colonna products.category (08_categoria_prodotti.sql)
+  // Colonne aggiunte dopo: category (08_categoria_prodotti.sql), nutrition (09_valori_nutrizionali.sql).
+  // Se una manca nell'archivio si legge senza e non la si invia (la riga verrebbe rifiutata).
+  const EXTRA = ["category", "nutrition"];
+  const cols = { category: true, nutrition: true };
   const catOf = p => CAT.categoryOf(p.name, p.location, p.category);
 
   // ---------- Dati ----------
+  async function loadProducts(get, cacheOnly) {
+    const path = list => `products?deleted_at=is.null&select=id,name,quantity,unit,location,expiry_date,image_path,barcode${list.map(c => "," + c).join("")}&order=name`;
+    let want = EXTRA.filter(c => cols[c]);
+    for (;;) {
+      try { return await get(path(want)); }
+      catch (e) {
+        if (!want.length || !(e.status === 400 || cacheOnly)) throw e;
+        if (e.status === 400) cols[want[want.length - 1]] = false;   // l'ultima colonna aggiunta non c'è ancora
+        want = want.slice(0, -1);
+      }
+    }
+  }
   async function loadAll(cacheOnly) {
     const get = path => (cacheOnly ? DB.peek(path) : DB.load(path));
-    // La colonna "category" arriva con 08_categoria_prodotti.sql: finché manca si legge senza
-    const prodPath = cols => `products?deleted_at=is.null&select=id,name,quantity,unit,location,expiry_date,image_path,barcode${cols}&order=name`;
-    const products = await get(prodPath(",category")).then(r => { if (!cacheOnly) hasCategory = true; return r; }, e => {
-      if (e.status === 400) hasCategory = false;
-      else if (!cacheOnly) throw e;
-      return get(prodPath(""));
-    });
+    const products = await loadProducts(get, cacheOnly);
     const [blocks, variants] = await Promise.all([
       get("plan_blocks?type=eq.meal&select=day,id,time,title&order=position"),
       get("meal_variants?select=day,meal_id,position,title,description,ingredients&order=position")
@@ -128,10 +137,9 @@
   }
 
   // ---------- Salvataggi (arrivano all'iPhone alla prossima apertura dell'app) ----------
-  // Senza la colonna nell'archivio la categoria scelta a mano non si salva (la riga verrebbe rifiutata)
   function forDB(values) {
     const v = Object.assign({}, values);
-    if (!hasCategory) delete v.category;
+    EXTRA.forEach(c => { if (!cols[c]) delete v[c]; });
     return v;
   }
   function saveProduct(p, values) {
@@ -153,27 +161,121 @@
     render();
   }
 
-  // ---------- Codice a barre: Open Food Facts (archivio libero e gratuito, senza chiave) ----------
+  // ---------- Open Food Facts: archivio libero e gratuito (nome, immagine, valori nutrizionali) ----------
+  const OFF_FIELDS = "code,product_name_it,product_name,generic_name_it,brands,quantity,categories_tags,countries_tags,image_front_url,image_front_small_url,nutriments,nutriscore_grade,nova_group";
+  const round = (n, d) => (typeof n === "number" && isFinite(n) ? Math.round(n * Math.pow(10, d)) / Math.pow(10, d) : null);
+
+  // Scheda di Open Food Facts → dati della Dispensa
+  function fromOFF(pr) {
+    let name = (pr.product_name_it || pr.product_name || pr.generic_name_it || "").trim();
+    const brand = String(Array.isArray(pr.brands) ? pr.brands[0] || "" : pr.brands || "").split(",")[0].trim();
+    if (!name) return null;
+    if (brand && !norm(name).includes(norm(brand))) name += " " + brand;
+    const category = CAT.fromTags(pr.categories_tags) || CAT.guess(name);
+    const n = pr.nutriments || {};
+    const nutrition = {
+      kcal: round(n["energy-kcal_100g"], 0), fat: round(n.fat_100g, 1), satfat: round(n["saturated-fat_100g"], 1),
+      carbs: round(n.carbohydrates_100g, 1), sugars: round(n.sugars_100g, 1), fiber: round(n.fiber_100g, 1),
+      protein: round(n.proteins_100g, 1), salt: round(n.salt_100g, 2),
+      nutriscore: /^[a-e]$/.test(pr.nutriscore_grade || "") ? pr.nutriscore_grade : null,
+      nova: pr.nova_group || null, quantity: pr.quantity || null
+    };
+    const hasNutrition = ["kcal", "fat", "carbs", "protein", "salt"].some(k => nutrition[k] !== null);
+    return {
+      name, brand, category, location: category ? CAT.placeFor(category) : "dispensa", barcode: pr.code || null,
+      imageUrl: pr.image_front_url || pr.image_front_small_url || null, thumbUrl: pr.image_front_small_url || pr.image_front_url || null,
+      nutrition: hasNutrition ? nutrition : null, italy: (pr.countries_tags || []).includes("en:italy")
+    };
+  }
+
+  // Richiesta a un servizio esterno: sul tablet passa dal ponte Java (niente limiti del browser)
+  async function getJSON(url) {
+    const L = K.L, C = window.LeiCollection;
+    if (L.httpGet && C && C.http) {
+      const r = await C.http(url);
+      try { return r.status >= 200 && r.status < 300 ? JSON.parse(r.body) : null; } catch (e) { return null; }
+    }
+    try { const r = await fetch(url); return r.ok ? await r.json() : null; } catch (e) { return null; }
+  }
+
   async function lookupBarcode(code) {
-    try {
-      const r = await fetch(`https://world.openfoodfacts.org/api/v2/product/${code}.json?fields=product_name_it,product_name,generic_name_it,brands,categories_tags`);
-      if (!r.ok) return null;
-      const j = await r.json();
-      const pr = j && j.status === 1 && j.product;
-      if (!pr) return null;
-      let name = (pr.product_name_it || pr.product_name || pr.generic_name_it || "").trim();
-      const brand = String(pr.brands || "").split(",")[0].trim();
-      if (!name) return null;
-      if (brand && !norm(name).includes(norm(brand))) name += " " + brand;
-      const category = CAT.fromTags(pr.categories_tags) || CAT.guess(name);
-      return { name, category, location: category ? CAT.placeFor(category) : "dispensa" };
-    } catch (e) { return null; }
+    const j = await getJSON(`https://world.openfoodfacts.org/api/v2/product/${code}.json?fields=${OFF_FIELDS}`);
+    const pr = j && j.status === 1 && j.product;
+    return pr ? fromOFF(Object.assign({ code }, pr)) : null;
+  }
+
+  // Ricerca per nome. Dal browser dell'iPhone Open Food Facts blocca le ricerche: si passa dalla
+  // funzione "off-search" sul nostro Supabase (supabase/functions/off-search). Sul tablet va diretta.
+  async function searchOFF(q) {
+    q = q.trim();
+    if (q.length < 3) return [];
+    const qs = `search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=8&fields=${OFF_FIELDS}`;
+    let j = null;
+    if (K.L.httpGet) j = await getJSON("https://world.openfoodfacts.org/cgi/search.pl?" + qs);
+    else j = (await DB.fn("off-search", "q=" + encodeURIComponent(q))) || (await getJSON("https://world.openfoodfacts.org/cgi/search.pl?" + qs));
+    const list = ((j && j.products) || []).map(fromOFF).filter(Boolean);
+    return list.sort((a, b) => b.italy - a.italy).slice(0, 5);
+  }
+
+  // Immagine del prodotto nella cartella privata (da un indirizzo di Open Food Facts o da una foto).
+  // Restituisce subito il percorso; il caricamento prosegue da solo.
+  function storeImage(src) {
+    const uid = DB.uid();
+    if (!uid || !src) return null;
+    const rel = `dispensa/${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}.jpg`;
+    const full = `${uid}/${rel}`;
+    photos[full] = typeof src === "string" ? src : URL.createObjectURL(src);   // anteprima finché non è caricata
+    (async () => {
+      try {
+        const blob = typeof src === "string" ? await (await fetch(src)).blob() : src;
+        await DB.uploadPhoto(rel, blob);
+      } catch (e) { console.warn("Immagine non caricata", e && e.message); }
+    })();
+    return full;
+  }
+
+  // Completa un prodotto già in dispensa con quello che manca (immagine, valori, categoria, codice)
+  function completeFrom(p, found) {
+    const values = {};
+    if (!p.image_path && found.imageUrl) values.image_path = storeImage(found.imageUrl);
+    if (!p.nutrition && found.nutrition && cols.nutrition) values.nutrition = found.nutrition;
+    if (!p.barcode && found.barcode) values.barcode = found.barcode;
+    if (!p.category && found.category && cols.category) values.category = found.category;
+    if (Object.keys(values).length && p.id !== null) saveProduct(p, values);
+    return Object.keys(values).length > 0;
+  }
+
+  // Nuovo prodotto da un risultato online
+  function rowFrom(found, extra) {
+    return Object.assign({
+      name: found.name, quantity: 1, unit: "pz", location: found.location, expiry_date: null,
+      category: found.category || null, barcode: found.barcode || null, nutrition: found.nutrition || null,
+      image_path: found.imageUrl ? storeImage(found.imageUrl) : null
+    }, extra || {});
+  }
+
+  // Dalla foto: la foto diventa l'immagine del prodotto, il testo letto serve a cercarlo online
+  function openPhotoSearch() {
+    window.LeiScanner.open({
+      mode: "photo",
+      hint: "Inquadra il davanti della confezione",
+      onPhoto: async blob => {
+        const C = window.LeiCollection;
+        K.toast("Leggo la confezione…");
+        let text = "";
+        try { const r = C && C.ocrCover ? await C.ocrCover(blob, () => { }) : null; text = r ? (r.title || r.lines.slice(0, 3).join(" ")) : ""; } catch (e) { }
+        const results = text ? await searchOFF(text) : [];
+        openSheet(null, { name: results.length ? "" : text, photoBlob: blob, results },
+          results.length ? "Scegli il prodotto giusto qui sotto, o scrivi tu il nome" : text ? "Non l'ho trovato online: controlla il nome" : "Non riesco a leggere la confezione: scrivi tu il nome");
+      }
+    });
   }
 
   function openScan() {
     window.LeiScanner.open({
       hint: "Inquadra il codice a barre del prodotto",
       onManual: () => openSheet(null),
+      onPhotoSearch: openPhotoSearch,
       onCode: async (code, o) => {
         const existing = data.products.find(p => p.barcode === code);
         if (existing) {
@@ -185,12 +287,12 @@
         if (!o.burst) K.toast("Cerco " + code + "…");
         const found = await lookupBarcode(code);
         if (!o.burst) {
-          openSheet(null, Object.assign({ barcode: code }, found || {}),
+          openSheet(null, found ? { found } : { barcode: code },
             found ? "Trovato online: controlla e aggiungi" : "Non l'ho trovato online: scrivi tu il nome");
           return null;
         }
         if (!found) return { text: `${code} · non trovato: aggiungilo a mano`, cls: "todo" };
-        addProduct({ name: found.name, quantity: 1, unit: "pz", location: found.location, expiry_date: null, category: found.category || null, barcode: code });
+        addProduct(rowFrom(found, { barcode: code }));
         return { text: `${found.name} · aggiunto`, cls: "ok" };
       }
     });
@@ -229,21 +331,6 @@
     if (tab === "prodotti") renderProducts();
     else if (tab === "ricette") renderRecipes();
     else renderShopping();
-  }
-
-  function thumb(p, cls) {
-    const t = h("div", "ds-thumb " + (cls || ""));
-    const url = p.image_path && photos[p.image_path];
-    if (url) {
-      const img = h("img");
-      img.src = url;
-      img.alt = "";
-      img.addEventListener("error", () => { t.innerHTML = ""; t.textContent = (p.name || "?").charAt(0).toUpperCase(); });
-      t.appendChild(img);
-    } else {
-      t.textContent = (p.name || "?").charAt(0).toUpperCase();
-    }
-    return t;
   }
 
   function renderProducts() {
@@ -326,7 +413,16 @@
     const grid = h("div", "ds-tiles");
     list.forEach(p => {
       const t = h("button", "ds-tile " + expiryClass(p));
-      const ic = categoryIcon(p);
+      // Con l'immagine del prodotto la foto, altrimenti l'icona della categoria
+      const url = p.image_path && photos[p.image_path];
+      const ic = url ? h("div", "ds-ic ds-ic-photo") : categoryIcon(p);
+      if (url) {
+        const img = h("img");
+        img.src = url;
+        img.alt = "";
+        img.addEventListener("error", () => { img.remove(); const c = catOf(p); ic.classList.remove("ds-ic-photo"); ic.style.color = c.color; ic.style.background = c.color + "22"; ic.insertAdjacentHTML("afterbegin", CAT.svg(c.icon)); });
+        ic.appendChild(img);
+      }
       const dot = h("span", "ds-zone-dot");
       dot.innerHTML = CAT.svg(ZONE_ICON[p.location] || "box");
       ic.appendChild(dot);
@@ -390,30 +486,91 @@
 
   // ---------- Scheda prodotto (modifica o nuovo) ----------
   function closeSheet() { ui.sheet.hidden = true; ui.sheet.innerHTML = ""; }
-  // prefill: dati già noti per un prodotto nuovo (dal codice a barre); note: riga di spiegazione in alto
+  // prefill (prodotto nuovo): { found } da Open Food Facts, { barcode }, { name, photoBlob, results } dalla foto.
+  // note: riga di spiegazione in alto.
   function openSheet(p, prefill, note) {
     const isNew = !p;
+    prefill = prefill || {};
     const draft = isNew
-      ? Object.assign({ name: "", quantity: 1, unit: "pz", location: cat ? CAT.placeFor(cat) : "dispensa", expiry_date: null, category: cat, barcode: null }, prefill || {})
-      : { quantity: Number(p.quantity), unit: p.unit, location: p.location, expiry_date: p.expiry_date, category: p.category || null };
+      ? { name: prefill.name || "", quantity: 1, unit: "pz", location: cat ? CAT.placeFor(cat) : "dispensa", expiry_date: null, category: cat, barcode: prefill.barcode || null, nutrition: null, imageSrc: prefill.photoBlob || null }
+      : { quantity: Number(p.quantity), unit: p.unit, location: p.location, expiry_date: p.expiry_date, category: p.category || null, imageSrc: null };
     ui.sheet.innerHTML = "";
     const box = h("div", "sheet-box ds-box");
+
+    // Intestazione: immagine (tocca per scattare una foto), nome e spiegazione
     const head = h("div", "ds-box-head");
-    if (!isNew) head.appendChild(p.image_path && photos[p.image_path] ? thumb(p, "big") : categoryIcon(p, "big"));
-    const title = h("div");
+    const pic = h("button", "ds-pic");
+    pic.setAttribute("aria-label", "Scatta una foto del prodotto");
+    function paintImage() {
+      pic.innerHTML = "";
+      const src = draft.imageSrc ? (typeof draft.imageSrc === "string" ? draft.imageSrc : (draft.imageUrl || (draft.imageUrl = URL.createObjectURL(draft.imageSrc)))) : (!isNew && p.image_path && photos[p.image_path]);
+      if (src) { const img = h("img"); img.src = src; img.alt = ""; pic.appendChild(img); }
+      else {
+        const c = CAT.categoryOf(isNew ? draft.name : p.name, draft.location, draft.category);
+        const ic = h("div", "ds-ic big");
+        ic.style.color = c.color; ic.style.background = c.color + "22";
+        ic.innerHTML = CAT.svg(c.icon);
+        pic.appendChild(ic);
+      }
+      pic.appendChild(h("span", "ds-pic-cam", "📷"));
+    }
+    pic.addEventListener("click", () => window.LeiScanner.open({
+      mode: "photo", hint: "Fotografa il prodotto",
+      onPhoto: blob => {
+        draft.imageSrc = blob; draft.imageUrl = null;
+        paintImage();
+        if (!isNew && p.id !== null) saveProduct(p, { image_path: storeImage(blob) });
+      }
+    }));
+    const title = h("div", "ds-box-title");
     title.appendChild(h("h3", null, isNew ? "Nuovo prodotto" : p.name));
     if (!isNew && p.id === null) title.appendChild(h("p", null, "In invio all'archivio…"));
-    if (note) title.appendChild(h("p", "ds-note-line", note));
-    head.appendChild(title);
+    const noteEl = h("p", "ds-note-line", note || "");
+    if (!note) noteEl.hidden = true;
+    title.appendChild(noteEl);
+    head.append(pic, title);
     box.appendChild(head);
+    const say = t => { noteEl.textContent = t; noteEl.hidden = !t; };
+
+    // Proposte trovate online: toccandone una si prende nome, immagine, categoria e valori
+    const sugg = h("div", "ds-sugg");
+    function showResults(list, onPick) {
+      sugg.innerHTML = "";
+      list.forEach(f => {
+        const b = h("button", "ds-sugg-b");
+        const im = h("div", "ds-sugg-img");
+        if (f.thumbUrl) { const img = h("img"); img.src = f.thumbUrl; img.alt = ""; im.appendChild(img); }
+        const t = h("div", "ds-sugg-t");
+        t.append(h("div", "ds-sugg-n", f.name), h("div", "ds-sugg-s", [f.nutrition && f.nutrition.quantity, f.nutrition && f.nutrition.kcal !== null ? f.nutrition.kcal + " kcal/100 g" : ""].filter(Boolean).join(" · ")));
+        b.append(im, t);
+        b.addEventListener("click", () => { sugg.innerHTML = ""; onPick(f); });
+        sugg.appendChild(b);
+      });
+    }
 
     let nameIn = null;
     if (isNew) {
       nameIn = h("input", "field");
-      nameIn.placeholder = "Nome (es. Pasta Barilla)";
+      nameIn.placeholder = "Nome (es. Pasta Barilla): lo cerco online";
       nameIn.value = draft.name;
-      nameIn.addEventListener("input", () => { draft.name = nameIn.value; paintCats(); });
-      box.appendChild(nameIn);
+      let timer = null, seq = 0;
+      nameIn.addEventListener("input", () => {
+        draft.name = nameIn.value;
+        paintCats(); paintImage();
+        clearTimeout(timer);
+        if (draft.picked || nameIn.value.trim().length < 3) { sugg.innerHTML = ""; return; }
+        timer = setTimeout(async () => {
+          const my = ++seq;
+          sugg.innerHTML = "";
+          sugg.appendChild(h("div", "wk-hint", "Cerco online…"));
+          const list = await searchOFF(nameIn.value);
+          if (my !== seq || ui.sheet.hidden) return;
+          sugg.innerHTML = "";
+          if (list.length) showResults(list, applyFound);
+          else sugg.appendChild(h("div", "wk-hint", "Niente online con questo nome."));
+        }, 800);
+      });
+      box.append(nameIn, sugg);
     }
 
     // Categoria: quella scelta a mano, altrimenti quella capita dal nome (segnata come "auto")
@@ -431,11 +588,11 @@
       b.dataset.cat = c.id;
       b.style.setProperty("--c", c.color);
       b.innerHTML = CAT.svg(c.icon) + `<span>${c.label}</span>`;
-      b.addEventListener("click", () => { draft.category = c.id; paintCats(); });
+      b.addEventListener("click", () => { draft.category = c.id; paintCats(); paintImage(); });
       cats.appendChild(b);
     });
     box.appendChild(cats);
-    paintCats();
+
     // Quantità con −/+
     const qRow = h("div", "ds-qrow");
     const minus = h("button", "dt-en", "−"), plus = h("button", "dt-en", "+");
@@ -454,9 +611,11 @@
     box.appendChild(qRow);
 
     const zones = h("div", "ds-zones");
+    function paintZones() { zones.querySelectorAll("button").forEach(x => x.classList.toggle("on", x.dataset.zone === draft.location)); }
     ZONES.forEach(([id, label]) => {
-      const b = h("button", "pill small" + (draft.location === id ? " on" : ""), label);
-      b.addEventListener("click", () => { draft.location = id; zones.querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b)); paintCats(); });
+      const b = h("button", "pill small", label);
+      b.dataset.zone = id;
+      b.addEventListener("click", () => { draft.location = id; paintZones(); paintCats(); paintImage(); });
       zones.appendChild(b);
     });
     box.appendChild(zones);
@@ -471,6 +630,43 @@
     expRow.append(h("span", "wk-hint", "Scadenza"), exp, noExp);
     box.appendChild(expRow);
 
+    // Valori nutrizionali (da Open Food Facts)
+    const nutri = h("div", "ds-nutri-wrap");
+    const paintNutri = () => { nutri.innerHTML = ""; const n = isNew ? draft.nutrition : p.nutrition; if (n) nutri.appendChild(nutritionBox(n)); };
+    box.appendChild(nutri);
+
+    // Prodotto già in dispensa senza immagine o valori: li cerca da solo (dal codice) o su richiesta (dal nome)
+    if (!isNew && p.id !== null && (!p.image_path || (cols.nutrition && !p.nutrition))) {
+      const refreshAfter = () => { paintImage(); paintNutri(); paintCats(); render(); };
+      if (p.barcode) {
+        lookupBarcode(p.barcode).then(f => { if (f && !ui.sheet.hidden && completeFrom(p, f)) { say("Ho aggiunto immagine e valori dal codice a barre"); refreshAfter(); } });
+      } else {
+        const find = h("button", "pill small ds-find", "Cerca online immagine e valori");
+        find.addEventListener("click", async () => {
+          find.disabled = true; find.textContent = "Cerco…";
+          const list = await searchOFF(p.name);
+          find.remove();
+          if (!list.length) { say("Non l'ho trovato online"); return; }
+          say("Quale di questi è il tuo prodotto?");
+          showResults(list, f => { completeFrom(p, f); say(""); refreshAfter(); });
+        });
+        box.insertBefore(find, cats);
+        box.insertBefore(sugg, cats);
+      }
+    }
+
+    function applyFound(f) {
+      draft.picked = true;
+      draft.name = f.name;
+      if (nameIn) nameIn.value = f.name;
+      draft.category = f.category || draft.category;
+      draft.location = f.location || draft.location;
+      draft.barcode = f.barcode || draft.barcode;
+      draft.nutrition = f.nutrition;
+      if (!(draft.imageSrc instanceof Blob) && f.imageUrl) draft.imageSrc = f.imageUrl;   // la foto scattata vince
+      paintImage(); paintCats(); paintZones(); paintNutri();
+    }
+
     const row = h("div", "row");
     const cancel = h("button", null, "Annulla");
     cancel.addEventListener("click", closeSheet);
@@ -479,7 +675,11 @@
       if (isNew) {
         const name = nameIn.value.trim();
         if (!name) return K.toast("Scrivi il nome del prodotto");
-        addProduct({ name, quantity: draft.quantity, unit: draft.unit, location: draft.location, expiry_date: draft.expiry_date, category: draft.category || null, barcode: draft.barcode || null });
+        addProduct({
+          name, quantity: draft.quantity, unit: draft.unit, location: draft.location, expiry_date: draft.expiry_date,
+          category: draft.category || null, barcode: draft.barcode || null, nutrition: draft.nutrition || null,
+          image_path: draft.imageSrc ? storeImage(draft.imageSrc) : null
+        });
       } else {
         if (p.id === null) return K.toast("Aspetta che il prodotto arrivi all'archivio");
         saveProduct(p, { quantity: draft.quantity, unit: draft.unit, location: draft.location, expiry_date: draft.expiry_date, category: draft.category || null });
@@ -498,8 +698,30 @@
       row.appendChild(del);
     }
     box.appendChild(row);
+
+    paintImage(); paintCats(); paintZones(); paintNutri();
+    if (prefill.found) applyFound(prefill.found);
+    if (prefill.results && prefill.results.length) showResults(prefill.results, applyFound);
     ui.sheet.appendChild(box);
     ui.sheet.hidden = false;
+  }
+
+  // Tabella dei valori per 100 g, con Nutri-Score
+  function nutritionBox(n) {
+    const box = h("div", "ds-nutri");
+    const top = h("div", "ds-nutri-top");
+    top.appendChild(h("span", "zone-h", "Valori per 100 g" + (n.quantity ? ` · confezione ${n.quantity}` : "")));
+    if (n.nutriscore) { const ns = h("span", "ds-ns ns-" + n.nutriscore, "Nutri-Score " + n.nutriscore.toUpperCase()); top.appendChild(ns); }
+    box.appendChild(top);
+    const num = (v, u) => (v === null || v === undefined ? "—" : String(v).replace(".", ",") + " " + u);
+    [["Energia", num(n.kcal, "kcal")], ["Grassi", num(n.fat, "g")], ["di cui saturi", num(n.satfat, "g"), true],
+     ["Carboidrati", num(n.carbs, "g")], ["di cui zuccheri", num(n.sugars, "g"), true], ["Fibre", num(n.fiber, "g")],
+     ["Proteine", num(n.protein, "g")], ["Sale", num(n.salt, "g")]].forEach(([label, val, sub]) => {
+      const r = h("div", "ds-nutri-row" + (sub ? " sub" : ""));
+      r.append(h("span", null, label), h("span", null, val));
+      box.appendChild(r);
+    });
+    return box;
   }
 
   // ---------- Lista della spesa ----------

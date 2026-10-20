@@ -84,3 +84,5 @@ input, textarea, select { font-size: 16px !important; }   /* sotto i 16px Safari
 .ds-cat-cell .ds-ic { width: 66%; max-width: 120px; border-radius: 28%; }
 .ds-cat-cell .ds-ic > svg { width: 64%; height: 64%; stroke-width: 1.7; }
 .ds-cat-name { font-size: 17px; }
+.ds-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.ds-tile { min-width: 0; }

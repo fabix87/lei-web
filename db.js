@@ -145,6 +145,16 @@
     return full;
   }
 
+  // Funzione sul server di Supabase (Edge Function), con l'accesso dell'utente. Restituisce il JSON o null.
+  async function fn(name, query) {
+    try {
+      const r = await fetch(`${SB.url}/functions/v1/${name}${query ? "?" + query : ""}`, {
+        headers: { apikey: SB.key, Authorization: `Bearer ${await token()}` }
+      });
+      return r.ok ? await r.json() : null;
+    } catch (e) { return null; }
+  }
+
   // ---------- Modifiche con coda ----------
   // Ogni modifica è una richiesta (metodo, percorso, dati) che resta in coda finché l'archivio non la accetta.
   let outbox = ls.get("outbox", []).map(o => o.path ? o : {   // coda salvata dalla versione 0.4
@@ -203,7 +213,7 @@
     get email() { return session ? session.email : ""; },
     get online() { return online; },
     get pending() { return outbox.length; },
-    signIn, signOut, load, peek, save, insert, update, flush, signPhotos, uploadPhoto, uid,
+    signIn, signOut, load, peek, save, insert, update, flush, signPhotos, uploadPhoto, uid, fn,
     onChange(fn) { listeners.add(fn); return () => listeners.delete(fn); }
   };
 })();

@@ -504,3 +504,30 @@ body.focusing .zone[data-zone="relax"] { opacity: .32; }
   .ds-spesa { grid-template-columns: 1fr; grid-template-rows: 1fr auto; }
   .ds-spesa .wk-side > * { max-height: 300px; }
 }
+.lei-photo-frame { left: 50%; right: auto; top: 50%; width: min(80vw, 62vh); height: min(80vw, 62vh); transform: translate(-50%, -58%); }
+/* Dispensa: immagine del prodotto, proposte online e valori nutrizionali */
+.ds-ic-photo { background: #fff; overflow: hidden; }
+.ds-ic-photo img { width: 100%; height: 100%; object-fit: contain; }
+.ds-box { max-height: calc(100% - 24px); overflow-y: auto; }
+.ds-box-title { min-width: 0; }
+.ds-pic { position: relative; width: 76px; height: 76px; flex: none; border-radius: 18px; overflow: hidden; padding: 0; background: var(--card); border: 1px solid var(--line); display: grid; place-items: center; }
+.ds-pic img { width: 100%; height: 100%; object-fit: contain; background: #fff; }
+.ds-pic .ds-ic.big { width: 100%; height: 100%; border-radius: 0; }
+.ds-pic-cam { position: absolute; right: 3px; bottom: 3px; font-size: 13px; background: rgba(8,19,28,.8); border-radius: 50%; width: 24px; height: 24px; display: grid; place-items: center; }
+.ds-sugg { display: flex; flex-direction: column; gap: 6px; }
+.ds-sugg:empty { display: none; }
+.ds-sugg-b { display: flex; gap: 10px; align-items: center; text-align: left; padding: 6px; border-radius: 14px; border: 1px solid var(--line); background: var(--card); }
+.ds-sugg-b:active { background: var(--card-press); }
+.ds-sugg-img { width: 44px; height: 44px; flex: none; border-radius: 10px; background: #fff; overflow: hidden; }
+.ds-sugg-img img { width: 100%; height: 100%; object-fit: contain; }
+.ds-sugg-t { min-width: 0; }
+.ds-sugg-n { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ds-sugg-s { font-size: 11px; color: var(--muted); }
+.ds-find { align-self: flex-start; }
+.ds-nutri { border: 1px solid var(--line); border-radius: 14px; padding: 8px 12px; }
+.ds-nutri-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 4px; }
+.ds-nutri-top .zone-h { margin: 0; }
+.ds-nutri-row { display: flex; justify-content: space-between; font-size: 13px; padding: 2px 0; border-top: 1px solid var(--line); }
+.ds-nutri-row.sub { color: var(--muted); font-size: 12px; padding-left: 12px; border-top: 0; }
+.ds-ns { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 6px; color: #fff; white-space: nowrap; }
+.ns-a { background: #1E8F4E; } .ns-b { background: #60AC0E; } .ns-c { background: #C9A300; color: #1A1406; } .ns-d { background: #E07B12; } .ns-e { background: #D93A20; }

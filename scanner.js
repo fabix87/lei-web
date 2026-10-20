@@ -1,6 +1,7 @@
 // Lettore di codici a barre a tutto schermo (fotocamera + ZXing), usato dalla Dispensa.
 // Stessa tecnica e stesso aspetto dello scanner della COLLECTION (classi col-scan-* in collection.css).
-//   LeiScanner.open({ hint, onCode(code, { burst }) → Promise<{ text, cls }>, onManual })
+//   LeiScanner.open({ hint, onCode(code, { burst }) → Promise<{ text, cls }>, onManual, onPhotoSearch })
+//   LeiScanner.open({ mode: "photo", hint, onPhoto(blob, url) }): foto quadrata con il pulsante di scatto
 // Scansione singola: al primo codice chiude e chiama onCode. Raffica: chiama onCode per ogni codice nuovo
 // e mostra in basso la riga restituita ({ text, cls: "ok" | "dup" | "todo" }).
 (function () {
@@ -43,8 +44,9 @@
     const video = h("video");
     video.setAttribute("playsinline", "");
     video.muted = true;
-    const frame = h("div", "col-scan-frame");
-    frame.appendChild(h("div", "col-scan-line"));
+    const photo = opts.mode === "photo";
+    const frame = h("div", photo ? "col-scan-frame lei-photo-frame" : "col-scan-frame");
+    if (!photo) frame.appendChild(h("div", "col-scan-line"));
     const top = h("div", "col-scan-top");
     const x = h("button", "sec-close", "✕");
     x.addEventListener("click", close);
@@ -56,6 +58,14 @@
     document.body.appendChild(box);
     const c = cam = { opts, box, video, status, burst: false, seen: new Map(), busy: false };
 
+    if (photo) {
+      const shutter = h("button", "col-shutter");
+      shutter.setAttribute("aria-label", "Scatta");
+      shutter.addEventListener("click", () => snap(c));
+      bottom.appendChild(shutter);
+      start(c);
+      return;
+    }
     const tools = h("div", "col-scan-row");
     const burst = h("button", "pill small", "Raffica: no");
     burst.addEventListener("click", () => {
@@ -79,6 +89,11 @@
       manual.addEventListener("click", () => { close(); opts.onManual(); });
       tools.appendChild(manual);
     }
+    if (opts.onPhotoSearch) {
+      const ph = h("button", "pill small", "Dalla foto");
+      ph.addEventListener("click", () => { const fn = opts.onPhotoSearch; close(); fn(); });
+      tools.appendChild(ph);
+    }
     c.list = h("div", "col-burst");
     bottom.append(tools, c.list);
     start(c);
@@ -99,7 +114,7 @@
       } catch (e) { }
       c.video.srcObject = stream;
       c.video.play().catch(() => { });
-      loop(c);
+      if (c.opts.mode !== "photo") loop(c);
     } catch (e) {
       c.status.textContent = "Fotocamera non disponibile: usa \"Scrivi il codice\".";
       c.status.classList.add("show");
@@ -155,6 +170,22 @@
       const r = await c.opts.onCode(code, { burst: true });
       if (r) { row.textContent = r.text; row.className = "col-burst-row " + (r.cls || "ok"); }
     } catch (e) { row.textContent = code + " · errore"; row.className = "col-burst-row todo"; }
+  }
+
+  // Foto: ritaglio quadrato al centro, 800×800 (immagine del prodotto e lettura del testo)
+  function snap(c) {
+    const v = c.video;
+    if (!v.videoWidth) return;
+    const side = Math.min(v.videoWidth, v.videoHeight) * 0.9;
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = 800;
+    canvas.getContext("2d").drawImage(v, (v.videoWidth - side) / 2, (v.videoHeight - side) / 2, side, side, 0, 0, 800, 800);
+    canvas.toBlob(blob => {
+      if (!blob) return;
+      const fn = c.opts.onPhoto;
+      close();
+      fn && fn(blob, URL.createObjectURL(blob));
+    }, "image/jpeg", 0.85);
   }
 
   function close() {
