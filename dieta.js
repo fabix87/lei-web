@@ -219,7 +219,7 @@
         setCheck(iso, b.id, !done);
         // Pasto fatto: la Dispensa propone di scalare gli ingredienti (con conferma)
         if (!done && b.type === "meal" && window.LeiDispensa && window.LeiDispensa.consumeMeal)
-          window.LeiDispensa.consumeMeal({ iso, id: b.id, title: b.title, ingredients: b.ingredients || [] });
+          window.LeiDispensa.consumeMeal({ iso, id: b.id, title: b.title, description: b.description, ingredients: b.ingredients || [] });
       });
       const body = h("div", "dt-item-body");
       const top = h("div", "dt-item-top");

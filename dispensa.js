@@ -119,8 +119,9 @@
     legumi: ["fagioli", "ceci", "lenticchie", "piselli", "fave"],
     pomodoro: ["pomodori", "pomodorini", "pelati", "passata", "polpa"]
   };
-  // Parola uguale, o stessa radice con desinenza diversa (zucchina/zucchine), non una parola più lunga (pane ≠ pangrattato)
-  const sameWord = (t, w) => t === w || (w.length > 3 && t.length <= w.length + 2 && t.slice(0, w.length - 1) === w.slice(0, -1));
+  // Parola uguale, o stessa radice con desinenza diversa (zucchina/zucchine, uovo/uova): solo le vocali finali cambiano
+  // (pane ≠ pangrattato, latte ≠ lattuga)
+  const sameWord = (t, w) => t === w || (w.length > 3 && t.length <= w.length + 1 && t.slice(0, w.length - 1) === w.slice(0, -1) && /^[aeiou]{1,2}$/.test(t.slice(w.length - 1)));
   function matchIngredient(ing) {
     const w = norm(ing);
     if (STAPLES.includes(w)) return { ok: true, staple: true, products: [] };
@@ -203,7 +204,8 @@
     return {
       name, brand, category, location: category ? CAT.placeFor(category) : "dispensa", barcode: pr.code || null,
       imageUrl: pr.image_front_url || pr.image_front_small_url || null, thumbUrl: pr.image_front_small_url || pr.image_front_url || null,
-      nutrition: hasNutrition ? nutrition : null, italy: (pr.countries_tags || []).includes("en:italy")
+      nutrition: hasNutrition ? nutrition : null, italy: (pr.countries_tags || []).includes("en:italy"),
+      salume: CAT.isSalume(name, pr.categories_tags)
     };
   }
 
@@ -232,7 +234,7 @@
     let j = null;
     if (K.L.httpGet) j = await getJSON("https://world.openfoodfacts.org/cgi/search.pl?" + qs);
     else j = (await DB.fn("off-search", "q=" + encodeURIComponent(q))) || (await getJSON("https://world.openfoodfacts.org/cgi/search.pl?" + qs));
-    const list = ((j && j.products) || []).map(fromOFF).filter(Boolean);
+    const list = ((j && j.products) || []).map(fromOFF).filter(f => f && !f.salume);   // salumi: esclusi dalla dieta
     return list.sort((a, b) => b.italy - a.italy).slice(0, 5);
   }
 
@@ -368,7 +370,7 @@
         const found = await lookupBarcode(code);
         if (!o.burst) {
           openSheet(null, found ? { found } : { barcode: code },
-            found ? "Trovato online: controlla e aggiungi" : "Non l'ho trovato online: scrivi tu il nome");
+            found ? (found.salume ? "Trovato online, ma è un salume: la tua dieta li esclude" : "Trovato online: controlla e aggiungi") : "Non l'ho trovato online: scrivi tu il nome");
           return null;
         }
         if (!found) return { text: `${code} · non trovato: aggiungilo a mano`, cls: "todo" };
@@ -379,7 +381,7 @@
   }
 
   // ---------- Consumi: porzioni standard della dieta e prodotti che si scalano ----------
-  const PORZ = Object.assign({ cereali: 100, pane: 100, carne: 100, pesce: 150, uova: 2, formaggio: 100, formaggioGrasso: 50,
+  const PORZ = Object.assign({ cereali: 100, pane: 100, patate: 350, carne: 100, pesce: 150, uova: 2, formaggio: 100, formaggioGrasso: 50,
     legumiSecchi: 30, legumiCotti: 90, verduraCotta: 200, verduraCruda: 80, frutta: 150, latte: 150, yogurt: 150 },
     ((window.LEI_CONFIG || {}).dieta || {}).porzioni || {});
   const has = (text, words) => words.some(w => ` ${text} `.includes(` ${w}`));
@@ -389,6 +391,8 @@
   function portionFor(ingredient, p) {
     const w = norm(ingredient), name = norm(p ? p.name : ingredient), c = p ? catOf(p).id : null;
     if (has(w, HERBS)) return null;                                     // aromi e limone: non si scalano
+    if (CAT.isSalume(p ? p.name : ingredient)) return null;              // salumi: esclusi dalla dieta
+    if ((has(w, ["patat"]) || has(name, ["patat"])) && !has(name, ["patatine", "chips"])) return { amount: PORZ.patate, unit: "g" };   // 350 g, una volta a settimana
     if (has(w, ["uova", "uovo"]) || has(name, ["uova", "uovo"])) return { amount: PORZ.uova, unit: "pz" };
     if (has(w, ["latte"]) || has(name, ["latte"])) return { amount: PORZ.latte, unit: "ml" };
     if (has(w, ["yogurt"]) || has(name, ["yogurt"])) return { amount: PORZ.yogurt, unit: "g" };
@@ -425,6 +429,7 @@
     const pack = packGrams(p);
     if (pack) return por.amount / pack;
     if (catOf(p).id === "frutta" || catOf(p).id === "verdura") return 1;   // a pezzi: un frutto, una zucchina
+    if (/yogurt/.test(norm(p.name))) return 1;                             // un vasetto
     return null;
   }
   const round2 = n => Math.round(n * 100) / 100;
@@ -458,11 +463,18 @@
     let used = {};
     try { used = JSON.parse(localStorage.getItem(USED)) || {}; } catch (e) { }
     const key = meal.iso + "|" + meal.id;
-    if (used[key] || !(meal.ingredients || []).length) return;
+    if (used[key]) return;
+    // Colazione e spuntini non hanno ricetta: si scala solo latte o yogurt (una porzione, dove lo schema li prevede)
+    let ings = meal.ingredients || [], dairy = false;
+    if (!ings.length) {
+      if (meal.id !== "colazione" && !/latte|yogurt/.test(norm(meal.description || ""))) return;
+      ings = ["latte", "yogurt"];
+      dairy = true;
+    }
     if (!data) { try { data = await loadAll(false); } catch (e) { return; } }
     // Per ogni ingrediente il prodotto di casa che scade prima
     const rows = [];
-    meal.ingredients.forEach(i => {
+    ings.forEach(i => {
       const m = matchIngredient(i);
       if (m.staple || !m.ok) return;
       const p = m.products.slice().sort((a, b) => (daysLeft(a) === null ? 1e9 : daysLeft(a)) - (daysLeft(b) === null ? 1e9 : daysLeft(b)))[0];
@@ -471,6 +483,11 @@
       rows.push({ p, ing: i, por, unit, times: unit ? 1 : 0 });
     });
     if (!rows.length) return;
+    // Latte OPPURE yogurt: si propone solo quello che scade prima, l'altro resta a "niente"
+    if (dairy) {
+      const exp = r => (daysLeft(r.p) === null ? 1e9 : daysLeft(r.p));
+      rows.sort((a, b) => exp(a) - exp(b)).forEach((r, n) => { if (n) r.times = 0; });
+    }
 
     const sheet = h("div", "sheet ds-consume");
     const box = h("div", "sheet-box");
@@ -831,6 +848,7 @@
     head.append(pic, title);
     box.appendChild(head);
     const say = t => { noteEl.textContent = t; noteEl.hidden = !t; };
+    if (!isNew && !note && CAT.isSalume(p.name)) say("Salume: la tua dieta li esclude");
 
     // Proposte trovate online: toccandone una si prende nome, immagine, categoria e valori
     const sugg = h("div", "ds-sugg");
@@ -1082,7 +1100,7 @@
   // Suggerimenti: prodotti finiti o scaduti e ingredienti che mancano per le ricette dei prossimi giorni
   function suggestions() {
     const out = [], seen = new Set();
-    const push = (name, source, why) => { const k = norm(name); if (seen.has(k) || inList(name)) return; seen.add(k); out.push({ name, source, why }); };
+    const push = (name, source, why) => { const k = norm(name); if (seen.has(k) || inList(name) || CAT.isSalume(name)) return; seen.add(k); out.push({ name, source, why }); };
     data.products.filter(p => Number(p.quantity) <= 0).forEach(p => push(p.name, "finito", "finito"));
     data.products.filter(p => expiryClass(p) === "expired").forEach(p => push(p.name, "scaduto", expiryText(p)));
     upcomingMeals().forEach(m => m.planned.miss.forEach(i => push(i, "ricetta", `${DAY_LONG[D.key(m.date)]}: ${m.planned.variant.title.split("—").pop().trim()}`)));

@@ -43,6 +43,7 @@ window.LEI_CONFIG = {
     pesoObiettivo: 75,
     porzioni: {
       cereali: 100,        // g: pasta, riso, farro, orzo, cous cous…
+      patate: 350,         // g, una volta a settimana al posto dei cereali
       pane: 100,           // g a pasto, preferibilmente senza sale
       carne: 100,          // g
       pesce: 150,          // g

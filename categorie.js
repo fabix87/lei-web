@@ -21,7 +21,7 @@
   // Ordine della griglia 3×3
   const LIST = [
     { id: "pasta", label: "Pasta", sub: "riso, patate, cereali", icon: "pasta", color: "#F2C66D" },
-    { id: "carne", label: "Carne", sub: "anche salumi", icon: "meat", color: "#F0A08A" },
+    { id: "carne", label: "Carne", sub: "", icon: "meat", color: "#F0A08A" },
     { id: "pesce", label: "Pesce", sub: "", icon: "fish", color: "#93B4F2" },
     { id: "scatolame", label: "Scatolame", sub: "pelati, legumi, tonno", icon: "can", color: "#D9B98A" },
     { id: "frutta", label: "Frutta", sub: "", icon: "apple", color: "#F5B07A" },
@@ -94,5 +94,13 @@
   const PLACE = { carne: "frigo", pesce: "frigo", freschi: "frigo", verdura: "frigo", surgelati: "freezer" };
   const placeFor = id => PLACE[id] || "dispensa";
 
-  window.LeiCategorie = { LIST, categoryOf, guess, fromTags, placeFor, svg };
+  // Salumi e insaccati: la dieta di Fabio li esclude, quindi Lei non li propone (ricerche, spesa, porzioni)
+  const SALUMI = ["prosciutt", "salame", "salami", "mortadella", "speck", "bresaola", "pancetta", "guanciale", "coppa=", "wurstel", "wuerstel", "wurst", "salsicc", "cotechino", "zampone", "nduja", "lardo", "affettat", "salum", "culatello", "porchetta", "soppressata", "cacciatorin"];
+  function isSalume(name, tags) {
+    const text = ` ${norm(name)} `;
+    if (SALUMI.some(w => w.endsWith("=") ? text.includes(` ${w.slice(0, -1)} `) : text.includes(` ${w}`))) return true;
+    return (tags || []).some(t => /hams|salami|sausages|cured-meats|prepared-meats|charcuterie/.test(t));
+  }
+
+  window.LeiCategorie = { LIST, categoryOf, guess, fromTags, placeFor, svg, isSalume };
 })();
