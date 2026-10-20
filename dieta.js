@@ -215,7 +215,12 @@
       const row = h("div", "dt-item" + (done ? " done" : ""));
       const tick = h("button", "dt-tick", done ? "✓" : "");
       tick.setAttribute("aria-label", done ? "Fatto" : "Da fare");
-      tick.addEventListener("click", () => setCheck(iso, b.id, !done));
+      tick.addEventListener("click", () => {
+        setCheck(iso, b.id, !done);
+        // Pasto fatto: la Dispensa propone di scalare gli ingredienti (con conferma)
+        if (!done && b.type === "meal" && window.LeiDispensa && window.LeiDispensa.consumeMeal)
+          window.LeiDispensa.consumeMeal({ iso, id: b.id, title: b.title, ingredients: b.ingredients || [] });
+      });
       const body = h("div", "dt-item-body");
       const top = h("div", "dt-item-top");
       top.append(h("span", "dt-time", b.time), h("span", "dt-title", b.title));

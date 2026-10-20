@@ -533,3 +533,17 @@ body.focusing .zone[data-zone="relax"] { opacity: .32; }
 .ds-nutri-row.sub { color: var(--muted); font-size: 12px; padding-left: 12px; border-top: 0; }
 .ds-ns { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 6px; color: #fff; white-space: nowrap; }
 .ns-a { background: #1E8F4E; } .ns-b { background: #60AC0E; } .ns-c { background: #C9A300; color: #1A1406; } .ns-d { background: #E07B12; } .ns-e { background: #D93A20; }
+/* Dispensa: consumi (pulsante "usato", formato confezione, conferma dalla Dieta) */
+.ds-tile { position: relative; }
+.ds-use { position: absolute; top: 6px; right: 6px; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-size: 18px; line-height: 1;
+  color: var(--gold); background: rgba(8,19,28,.7); border: 1px solid rgba(242,198,109,.45); }
+.ds-use:active { background: var(--gold); color: #1A1406; }
+.ds-packrow { display: flex; align-items: center; gap: 10px; }
+.ds-packrow .field { flex: 1; }
+.ds-userow { display: flex; gap: 8px; flex-wrap: wrap; }
+.ds-consume { position: fixed; z-index: 50; }
+.ds-consume .sheet-box { max-height: calc(100% - 40px); overflow-y: auto; }
+.ds-cons-row { display: flex; flex-direction: column; gap: 6px; padding: 8px 0; border-top: 1px solid var(--line); }
+.ds-cons-name { font-size: 15px; }
+.ds-cons-opts { display: flex; gap: 6px; flex-wrap: wrap; }
+.ds-cons-opts .pill.small.on { color: #1A1406; background: var(--gold); border-color: var(--gold); }

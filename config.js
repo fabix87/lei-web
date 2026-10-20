@@ -37,7 +37,27 @@ window.LEI_CONFIG = {
   collection: { googleBooksKey: "" },
 
   // Sezione Dieta: peso obiettivo (linea tratteggiata nel grafico)
-  dieta: { pesoObiettivo: 75 },
+  // porzioni: quantità standard dello schema della dietista (DIETA26/DIeta24), a crudo e al netto degli scarti.
+  // La Dispensa le usa per scalare i prodotti quando un pasto è fatto o quando tocchi "Usato".
+  dieta: {
+    pesoObiettivo: 75,
+    porzioni: {
+      cereali: 100,        // g: pasta, riso, farro, orzo, cous cous…
+      pane: 100,           // g a pasto, preferibilmente senza sale
+      carne: 100,          // g
+      pesce: 150,          // g
+      uova: 2,             // pezzi (+ albume libero)
+      formaggio: 100,      // g, formaggi magri (mozzarella, ricotta, stracchino…)
+      formaggioGrasso: 50, // g (parmigiano, fontina, gorgonzola…)
+      legumiSecchi: 30,    // g
+      legumiCotti: 90,     // g, freschi o in scatola
+      verduraCotta: 200,   // g
+      verduraCruda: 80,    // g (insalata, pomodori crudi…)
+      frutta: 150,         // g
+      latte: 150,          // ml
+      yogurt: 150          // g
+    }
+  },
 
   // Pagina "Cucina"
   cucina: {

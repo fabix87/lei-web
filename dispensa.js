@@ -378,6 +378,146 @@
     });
   }
 
+  // ---------- Consumi: porzioni standard della dieta e prodotti che si scalano ----------
+  const PORZ = Object.assign({ cereali: 100, pane: 100, carne: 100, pesce: 150, uova: 2, formaggio: 100, formaggioGrasso: 50,
+    legumiSecchi: 30, legumiCotti: 90, verduraCotta: 200, verduraCruda: 80, frutta: 150, latte: 150, yogurt: 150 },
+    ((window.LEI_CONFIG || {}).dieta || {}).porzioni || {});
+  const has = (text, words) => words.some(w => ` ${text} `.includes(` ${w}`));
+  const HERBS = ["basilico", "menta", "prezzemolo", "origano", "rosmarino", "salvia", "timo", "zenzero", "erbe", "erbette", "limone", "aglio", "pepe", "peperoncino", "aceto"];
+
+  // Porzione standard per un ingrediente della ricetta o per un prodotto: { amount, unit: "g" | "ml" | "pz" } o null
+  function portionFor(ingredient, p) {
+    const w = norm(ingredient), name = norm(p ? p.name : ingredient), c = p ? catOf(p).id : null;
+    if (has(w, HERBS)) return null;                                     // aromi e limone: non si scalano
+    if (has(w, ["uova", "uovo"]) || has(name, ["uova", "uovo"])) return { amount: PORZ.uova, unit: "pz" };
+    if (has(w, ["latte"]) || has(name, ["latte"])) return { amount: PORZ.latte, unit: "ml" };
+    if (has(w, ["yogurt"]) || has(name, ["yogurt"])) return { amount: PORZ.yogurt, unit: "g" };
+    if (has(w, ["pane"]) || has(name, ["pane", "pancarre", "panino", "baguette"])) return { amount: PORZ.pane, unit: "g" };
+    if (has(w, ["legumi", "lenticchie", "ceci", "fagioli", "piselli", "fave"]) || has(name, ["lenticchie", "ceci", "fagioli", "piselli", "fave"]))
+      return { amount: c === "scatolame" || c === "surgelati" ? PORZ.legumiCotti : PORZ.legumiSecchi, unit: "g" };
+    if (has(w, ["formaggi", "mozzarella", "ricotta", "parmigiano", "grana"]) || has(name, ["formaggi", "mozzarella", "ricotta", "stracchino", "primosale", "parmigiano", "grana", "pecorino", "fontina", "gorgonzola", "asiago", "taleggio"]))
+      return { amount: has(name, ["parmigiano", "grana", "pecorino", "fontina", "gorgonzola", "asiago", "taleggio"]) ? PORZ.formaggioGrasso : PORZ.formaggio, unit: "g" };
+    if (has(w, ["insalata", "lattuga", "rucola", "pomodorini", "pomodoro", "cetrioli"]) && !has(name, ["pelati", "passata", "polpa"])) return { amount: PORZ.verduraCruda, unit: "g" };
+    if (has(w, ["pesce"]) || c === "pesce") return { amount: PORZ.pesce, unit: "g" };
+    if (has(w, ["carne"]) || c === "carne") return { amount: PORZ.carne, unit: "g" };
+    if (has(w, ["pasta", "riso", "cereali", "farro", "orzo", "couscous", "quinoa"]) || (c === "pasta" && !has(name, ["patat"]))) return { amount: PORZ.cereali, unit: "g" };
+    if (has(w, ["frutta", "frutto"]) || c === "frutta") return { amount: PORZ.frutta, unit: "g" };
+    if (has(w, ["verdur", "minestrone", "zucchin", "carot", "zucca", "spinaci", "broccol", "cavol", "fagiolini", "melanzan", "peperon"]) || c === "verdura")
+      return { amount: PORZ.verduraCotta, unit: "g" };
+    return null;
+  }
+
+  // Grammi (o ml) di una confezione dal formato scritto ("500 g", "4 x 125 g", "1,5 l"): null se non si capisce
+  function packGrams(p) {
+    const s = norm(String((p.nutrition && p.nutrition.quantity) || "").replace(",", "."));
+    const m = s.match(/(?:(\d+)\s*x\s*)?(\d+(?:\.\d+)?)\s*(kg|g|gr|ml|cl|l)\b/);
+    if (!m) return null;
+    const mult = { kg: 1000, g: 1, gr: 1, ml: 1, cl: 10, l: 1000 }[m[3]];
+    return (m[1] ? +m[1] : 1) * parseFloat(m[2]) * mult;
+  }
+
+  // Una porzione (g/ml/pz) espressa nell'unità del prodotto; null se non si può calcolare
+  function toUnits(p, por) {
+    if (!por) return null;
+    if (por.unit === "pz") return p.unit === "pz" ? por.amount : null;
+    if (p.unit === "g" || p.unit === "ml") return por.amount;
+    if (p.unit === "kg" || p.unit === "l") return por.amount / 1000;
+    const pack = packGrams(p);
+    if (pack) return por.amount / pack;
+    if (catOf(p).id === "frutta" || catOf(p).id === "verdura") return 1;   // a pezzi: un frutto, una zucchina
+    return null;
+  }
+  const round2 = n => Math.round(n * 100) / 100;
+  const packUnit = p => /\b(ml|cl|l)\b/.test(norm((p.nutrition && p.nutrition.quantity) || "")) ? "ml" : "g";
+  // Quanto resta, leggibile: "0,8 pz · circa 400 g"
+  function leftText(p, q) {
+    const pack = p.unit === "pz" && packGrams(p);
+    return qty(q, p.unit) + (pack && q > 0 ? ` · circa ${Math.round(q * pack)} ${packUnit(p)}` : "");
+  }
+  // Etichetta della porzione: "100 g", "2 uova"
+  const porText = por => por ? (por.unit === "pz" ? `${por.amount} pz` : `${por.amount} ${por.unit}`) : "";
+  // Etichetta di quello che si toglie davvero: a pezzi senza formato della confezione si conta 1 pezzo
+  const useText = (p, por, units) => (p.unit === "pz" && por && por.unit !== "pz" && !packGrams(p) ? qty(units, "pz") : porText(por));
+
+  function useProduct(p, units, label) {
+    if (p.id === null) return K.toast("Aspetta che il prodotto arrivi all'archivio");
+    const before = Number(p.quantity), after = Math.max(0, round2(before - units));
+    saveProduct(p, { quantity: after });
+    K.toast(after > 0 ? `${p.name}: ${label} · restano ${leftText(p, after)}` : `${p.name} finito: lo trovi tra i suggeriti della spesa`);
+  }
+  // "Usato" dal riquadro o dalla scheda: una porzione standard, altrimenti un passo dell'unità
+  function useOnePortion(p) {
+    const por = portionFor(p.name, p), u = toUnits(p, por);
+    if (u) useProduct(p, u, `usato ${useText(p, por, u)}`);
+    else useProduct(p, STEP[p.unit] || 1, `usato ${qty(STEP[p.unit] || 1, p.unit)}`);
+  }
+
+  // Dalla Dieta: pasto spuntato → riquadro di conferma con i prodotti da scalare (mai da solo)
+  const USED = "lei.ds.used";
+  async function consumeMeal(meal) {
+    let used = {};
+    try { used = JSON.parse(localStorage.getItem(USED)) || {}; } catch (e) { }
+    const key = meal.iso + "|" + meal.id;
+    if (used[key] || !(meal.ingredients || []).length) return;
+    if (!data) { try { data = await loadAll(false); } catch (e) { return; } }
+    // Per ogni ingrediente il prodotto di casa che scade prima
+    const rows = [];
+    meal.ingredients.forEach(i => {
+      const m = matchIngredient(i);
+      if (m.staple || !m.ok) return;
+      const p = m.products.slice().sort((a, b) => (daysLeft(a) === null ? 1e9 : daysLeft(a)) - (daysLeft(b) === null ? 1e9 : daysLeft(b)))[0];
+      if (rows.some(r => r.p === p)) return;
+      const por = portionFor(i, p), unit = toUnits(p, por);
+      rows.push({ p, ing: i, por, unit, times: unit ? 1 : 0 });
+    });
+    if (!rows.length) return;
+
+    const sheet = h("div", "sheet ds-consume");
+    const box = h("div", "sheet-box");
+    box.appendChild(h("h3", null, "Scalo dalla dispensa?"));
+    box.appendChild(h("p", null, `${meal.title.split("—").pop().trim()}: porzioni della tua dieta, a crudo. Cambia quello che non torna.`));
+    rows.forEach(r => {
+      const row = h("div", "ds-cons-row");
+      const info = h("div", "ds-cons-info");
+      const nm = h("div", "ds-cons-name", r.p.name), sub = h("div", "wk-hint");
+      info.append(nm, sub);
+      const opts = h("div", "ds-cons-opts");
+      const choices = r.unit ? [[0, "niente"], [0.5, "½"], [1, useText(r.p, r.por, r.unit)], [2, "×2"]] : [[0, "niente"], [-1, "−1 " + r.p.unit]];
+      const paint = () => {
+        const take = r.times === -1 ? 1 : r.unit ? r.unit * r.times : 0;
+        r.take = take;
+        sub.textContent = take ? `restano ${leftText(r.p, Math.max(0, round2(Number(r.p.quantity) - take)))}` : `per «${r.ing}» · non lo scalo`;
+        opts.querySelectorAll("button").forEach(b => b.classList.toggle("on", +b.dataset.t === r.times));
+      };
+      choices.forEach(([t, label]) => {
+        const b = h("button", "pill small", label);
+        b.dataset.t = t;
+        b.addEventListener("click", () => { r.times = t; paint(); });
+        opts.appendChild(b);
+      });
+      row.append(info, opts);
+      box.appendChild(row);
+      paint();
+    });
+    if (rows.some(r => r.por && !r.unit)) box.appendChild(h("p", "wk-hint", "Per scalare a grammi i prodotti contati a pezzi serve il formato della confezione: lo prendo da Open Food Facts o lo scrivi tu nella scheda del prodotto."));
+    const act = h("div", "row");
+    const no = h("button", null, "Non ora"), ok = h("button", "primary", "Scala");
+    const close = () => sheet.remove();
+    no.addEventListener("click", close);
+    ok.addEventListener("click", () => {
+      rows.filter(r => r.take > 0 && r.p.id !== null).forEach(r => saveProduct(r.p, { quantity: Math.max(0, round2(Number(r.p.quantity) - r.take)) }));
+      used[key] = Date.now();
+      try { localStorage.setItem(USED, JSON.stringify(used)); } catch (e) { }
+      close();
+      K.toast("Dispensa aggiornata");
+    });
+    act.append(no, ok);
+    box.appendChild(act);
+    sheet.appendChild(box);
+    sheet.addEventListener("click", e => { if (e.target === sheet) close(); });
+    document.body.appendChild(sheet);
+  }
+
   // ---------- Interfaccia ----------
   function build(el) {
     el.innerHTML = "";
@@ -511,10 +651,20 @@
       dot.innerHTML = CAT.svg(ZONE_ICON[p.location] || "box");
       ic.appendChild(dot);
       const foot = h("div", "ds-tile-foot");
-      foot.appendChild(h("span", "ds-qty", qty(p.quantity, p.unit)));
+      const pack = p.unit === "pz" && packGrams(p), q = Number(p.quantity);
+      // Confezione iniziata: meglio i grammi che restano ("circa 400 g") delle frazioni di pezzo
+      foot.appendChild(h("span", "ds-qty", pack && q % 1 ? `circa ${Math.round(q * pack)} ${packUnit(p)}` : qty(p.quantity, p.unit)));
       const se = shortExpiry(p);
       if (se) foot.appendChild(h("span", "ds-badge", se));
       t.append(ic, h("div", "ds-tile-name", p.name), foot);
+      // "Usato": toglie una porzione della dieta (o un pezzo) senza aprire la scheda
+      if (Number(p.quantity) > 0) {
+        const use = h("span", "ds-use", "−");
+        use.setAttribute("role", "button");
+        use.setAttribute("aria-label", "Usato una porzione");
+        use.addEventListener("click", e => { e.stopPropagation(); useOnePortion(p); });
+        t.appendChild(use);
+      }
       t.addEventListener("click", () => openSheet(p));
       grid.appendChild(t);
     });
@@ -760,6 +910,28 @@
     qRow.append(minus, qVal, plus, unit);
     box.appendChild(qRow);
 
+    // Formato della confezione (da Open Food Facts o scritto a mano): serve a scalare a grammi
+    const packRow = h("div", "ds-packrow");
+    const packIn = h("input", "field");
+    packIn.placeholder = "es. 500 g";
+    const curNut = () => (isNew ? draft.nutrition : p.nutrition) || null;
+    packIn.value = (curNut() && curNut().quantity) || "";
+    packIn.addEventListener("input", () => (draft.pack = packIn.value.trim()));
+    packRow.append(h("span", "wk-hint", "Confezione"), packIn);
+    box.appendChild(packRow);
+
+    // Prodotto in casa: "Usato" toglie una porzione della dieta, "Finito" lo azzera
+    if (!isNew && p.id !== null && Number(p.quantity) > 0) {
+      const por = portionFor(p.name, p), u = toUnits(p, por);
+      const useRow = h("div", "ds-userow");
+      const used = h("button", "pill small", u ? `Usato ${useText(p, por, u)}` : `Usato ${qty(STEP[p.unit] || 1, p.unit)}`);
+      used.addEventListener("click", () => { useOnePortion(p); closeSheet(); });
+      const done = h("button", "pill small", "Finito");
+      done.addEventListener("click", () => { useProduct(p, Number(p.quantity), "finito"); closeSheet(); });
+      useRow.append(used, done);
+      box.appendChild(useRow);
+    }
+
     const zones = h("div", "ds-zones");
     function paintZones() { zones.querySelectorAll("button").forEach(x => x.classList.toggle("on", x.dataset.zone === draft.location)); }
     ZONES.forEach(([id, label]) => {
@@ -782,7 +954,7 @@
 
     // Valori nutrizionali (da Open Food Facts)
     const nutri = h("div", "ds-nutri-wrap");
-    const paintNutri = () => { nutri.innerHTML = ""; const n = isNew ? draft.nutrition : p.nutrition; if (n) nutri.appendChild(nutritionBox(n)); };
+    const paintNutri = () => { nutri.innerHTML = ""; const n = isNew ? draft.nutrition : p.nutrition; if (n && ["kcal", "fat", "carbs", "protein", "salt"].some(k => n[k] !== null && n[k] !== undefined)) nutri.appendChild(nutritionBox(n)); };
     box.appendChild(nutri);
 
     // Prodotto già in dispensa senza immagine o valori: li cerca da solo (dal codice) o su richiesta (dal nome)
@@ -813,6 +985,7 @@
       draft.location = f.location || draft.location;
       draft.barcode = f.barcode || draft.barcode;
       draft.nutrition = f.nutrition;
+      if (f.nutrition && f.nutrition.quantity && !draft.pack) packIn.value = f.nutrition.quantity;
       if (!(draft.imageSrc instanceof Blob) && f.imageUrl) draft.imageSrc = f.imageUrl;   // la foto scattata vince
       paintImage(); paintCats(); paintZones(); paintNutri();
     }
@@ -827,12 +1000,14 @@
         if (!name) return K.toast("Scrivi il nome del prodotto");
         addProduct({
           name, quantity: draft.quantity, unit: draft.unit, location: draft.location, expiry_date: draft.expiry_date,
-          category: draft.category || null, barcode: draft.barcode || null, nutrition: draft.nutrition || null,
+          category: draft.category || null, barcode: draft.barcode || null, nutrition: withPack(draft.nutrition, draft.pack),
           image_path: draft.imageSrc ? storeImage(draft.imageSrc) : null
         });
       } else {
         if (p.id === null) return K.toast("Aspetta che il prodotto arrivi all'archivio");
-        saveProduct(p, { quantity: draft.quantity, unit: draft.unit, location: draft.location, expiry_date: draft.expiry_date, category: draft.category || null });
+        const values = { quantity: draft.quantity, unit: draft.unit, location: draft.location, expiry_date: draft.expiry_date, category: draft.category || null };
+        if (draft.pack !== undefined) values.nutrition = withPack(p.nutrition, draft.pack);
+        saveProduct(p, values);
         closeSheet();
       }
     });
@@ -854,6 +1029,13 @@
     if (prefill.results && prefill.results.length) showResults(prefill.results, applyFound);
     ui.sheet.appendChild(box);
     ui.sheet.hidden = false;
+  }
+
+  // Il formato della confezione sta insieme ai valori nutrizionali (campo "quantity")
+  function withPack(nut, pack) {
+    if (pack === undefined) return nut || null;
+    const n = Object.assign({}, nut || {}, { quantity: pack || null });
+    return Object.values(n).some(v => v !== null && v !== undefined) ? n : null;
   }
 
   // Tabella dei valori per 100 g, con Nutri-Score
@@ -989,7 +1171,7 @@
     }
     data = prev || d;
   }
-  window.LeiDispensa = { renderTiles };
+  window.LeiDispensa = { renderTiles, consumeMeal };   // consumeMeal: dalla Dieta, quando si spunta un pasto
 
   S.register("dispensa", {
     open(el, opts) {
