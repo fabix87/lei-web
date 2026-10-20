@@ -76,12 +76,16 @@
 
   // Le foto stanno in una cartella privata: chiede indirizzi temporanei solo per quelle che mancano
   async function loadPhotos() {
+    await retryUploads();
     const missing = data.products.map(p => p.image_path).filter(p => p && !photos[p]);
-    if (!missing.length) return;
-    try {
-      Object.assign(photos, await DB.signPhotos(missing));
-      render();
-    } catch (e) { }
+    if (missing.length) {
+      try {
+        Object.assign(photos, await DB.signPhotos(missing));
+        photosChecked = true;
+        render();
+      } catch (e) { }
+    } else photosChecked = true;
+    if (photosChecked) autoComplete();
   }
 
   // ---------- Scadenze ----------
@@ -217,6 +221,47 @@
     return list.sort((a, b) => b.italy - a.italy).slice(0, 5);
   }
 
+  // Scarica l'immagine. Safari rifiuta l'immagine già mostrata in pagina se la si chiede di nuovo
+  // (la riusa dalla memoria senza i permessi): si chiede sempre una copia nuova.
+  async function fetchImage(src) {
+    if (typeof src !== "string") return src;
+    const url = src.startsWith("data:") ? src : src + (src.includes("?") ? "&" : "?") + "lei=" + Date.now();
+    const r = await fetch(url, { cache: "no-store" });
+    if (!r.ok) throw new Error("immagine " + r.status);
+    return r.blob();
+  }
+  const blobToDataURL = blob => new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(blob); });
+
+  // Caricamenti non riusciti: restano in coda sul dispositivo e si riprovano alla prossima apertura
+  const UPLOADS = "lei.ds.uploads";
+  const pendingUploads = () => { try { return JSON.parse(localStorage.getItem(UPLOADS)) || []; } catch (e) { return []; } };
+  const savePending = list => { try { localStorage.setItem(UPLOADS, JSON.stringify(list.slice(-20))); } catch (e) { } };
+  async function upload(rel, src) {
+    try {
+      await DB.uploadPhoto(rel, await fetchImage(src));
+      return true;
+    } catch (e) {
+      console.warn("Immagine non caricata, riprovo più tardi", e && e.message);
+      const keep = typeof src === "string" ? src : await blobToDataURL(src).catch(() => null);
+      if (keep) savePending(pendingUploads().filter(u => u.rel !== rel).concat([{ rel, src: keep }]));
+      return false;
+    }
+  }
+  let retrying = false;
+  async function retryUploads() {
+    const list = pendingUploads();
+    if (retrying || !list.length || !DB.signedIn) return;
+    retrying = true;
+    for (const u of list) {
+      try {
+        await DB.uploadPhoto(u.rel, await fetchImage(u.src));
+        savePending(pendingUploads().filter(x => x.rel !== u.rel));
+        delete photos[`${DB.uid()}/${u.rel}`];   // la prossima volta l'indirizzo dalla cartella privata
+      } catch (e) { }
+    }
+    retrying = false;
+  }
+
   // Immagine del prodotto nella cartella privata (da un indirizzo di Open Food Facts o da una foto).
   // Restituisce subito il percorso; il caricamento prosegue da solo.
   function storeImage(src) {
@@ -225,24 +270,44 @@
     const rel = `dispensa/${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}.jpg`;
     const full = `${uid}/${rel}`;
     photos[full] = typeof src === "string" ? src : URL.createObjectURL(src);   // anteprima finché non è caricata
-    (async () => {
-      try {
-        const blob = typeof src === "string" ? await (await fetch(src)).blob() : src;
-        await DB.uploadPhoto(rel, blob);
-      } catch (e) { console.warn("Immagine non caricata", e && e.message); }
-    })();
+    upload(rel, src);
     return full;
   }
+
+  // L'immagine manca, o il percorso c'è ma il file non è mai arrivato nella cartella privata
+  let photosChecked = false;
+  const imageMissing = p => !p.image_path || (photosChecked && !photos[p.image_path] && !pendingUploads().some(u => p.image_path.endsWith(u.rel)));
 
   // Completa un prodotto già in dispensa con quello che manca (immagine, valori, categoria, codice)
   function completeFrom(p, found) {
     const values = {};
-    if (!p.image_path && found.imageUrl) values.image_path = storeImage(found.imageUrl);
+    if (imageMissing(p) && found.imageUrl) values.image_path = storeImage(found.imageUrl);
     if (!p.nutrition && found.nutrition && cols.nutrition) values.nutrition = found.nutrition;
     if (!p.barcode && found.barcode) values.barcode = found.barcode;
     if (!p.category && found.category && cols.category) values.category = found.category;
     if (Object.keys(values).length && p.id !== null) saveProduct(p, values);
     return Object.keys(values).length > 0;
+  }
+
+  // In sottofondo: i prodotti con il codice a barre ma senza immagine o valori si completano da soli
+  // (al massimo 5 per volta; un codice già provato si riprova dopo una settimana)
+  const TRIED = "lei.ds.tried";
+  let completing = false;
+  async function autoComplete() {
+    if (completing || !data || !DB.signedIn) return;
+    let tried = {};
+    try { tried = JSON.parse(localStorage.getItem(TRIED)) || {}; } catch (e) { }
+    const week = 7 * 86400000;
+    const todo = data.products.filter(p => p.id !== null && p.barcode && (imageMissing(p) || (cols.nutrition && !p.nutrition)) && !(tried[p.barcode] > Date.now() - week)).slice(0, 5);
+    if (!todo.length) return;
+    completing = true;
+    for (const p of todo) {
+      const f = await lookupBarcode(p.barcode);
+      tried[p.barcode] = Date.now();
+      if (f) completeFrom(p, f);
+    }
+    try { localStorage.setItem(TRIED, JSON.stringify(tried)); } catch (e) { }
+    completing = false;
   }
 
   // Nuovo prodotto da un risultato online
@@ -639,7 +704,7 @@
     box.appendChild(nutri);
 
     // Prodotto già in dispensa senza immagine o valori: li cerca da solo (dal codice) o su richiesta (dal nome)
-    if (!isNew && p.id !== null && (!p.image_path || (cols.nutrition && !p.nutrition))) {
+    if (!isNew && p.id !== null && (imageMissing(p) || (cols.nutrition && !p.nutrition))) {
       const refreshAfter = () => { paintImage(); paintNutri(); paintCats(); render(); };
       if (p.barcode) {
         lookupBarcode(p.barcode).then(f => { if (f && !ui.sheet.hidden && completeFrom(p, f)) { say("Ho aggiunto immagine e valori dal codice a barre"); refreshAfter(); } });

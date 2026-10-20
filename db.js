@@ -117,7 +117,7 @@
       headers: { apikey: SB.key, Authorization: `Bearer ${await token()}`, "Content-Type": "application/json" },
       body: JSON.stringify({ expiresIn: 3600, paths })
     });
-    if (!r.ok) return {};
+    if (!r.ok) throw Object.assign(new Error("Indirizzi delle foto non disponibili"), { status: r.status });   // diverso da "foto che manca"
     const list = await r.json().catch(() => []);
     const out = {};
     list.forEach(x => { if (x.signedURL && !x.error) out[x.path] = `${SB.url}/storage/v1${x.signedURL}`; });
