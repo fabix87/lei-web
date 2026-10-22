@@ -112,6 +112,11 @@
   .col-grid { grid-template-columns: repeat(3, 1fr); }
   .sec-col .sec-head { flex-wrap: wrap; }
   .col-search { order: 3; flex: 1 1 100%; }
+  /* Home stretta: scritta e icone più piccole perché stiano nel riquadro */
+  .col-launch { padding: 14px 16px; }
+  .col-launch .cl-title { font-size: 17px; letter-spacing: .1em; }
+  .col-launch .cl-icons { gap: 12px; min-width: 0; }
+  .col-launch .cl-icons svg { width: 26px; height: 26px; flex: none; }
 }
 
 /* Lettura della copertina (OCR) */
