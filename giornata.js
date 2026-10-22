@@ -74,14 +74,17 @@
     return refreshing;
   }
 
-  // Indirizzo segreto iCal (solo iPhone): lo salva nell'archivio e riscarica il calendario
+  // Indirizzo segreto iCal (solo iPhone): lo salva nell'archivio e riscarica il calendario.
+  // Restituisce "ok", "formato" (non è un indirizzo iCal di Google) o "pubblico" (l'indirizzo pubblico funziona
+  // solo con il calendario reso pubblico: serve quello segreto, che contiene "private-").
   async function link(url) {
     const u = String(url || "").trim().replace(/^webcal:\/\//i, "https://");
-    if (!/^https:\/\/calendar\.google\.com\/calendar\/ical\/\S+\.ics$/.test(u)) return false;
+    if (!/^https:\/\/calendar\.google\.com\/calendar\/ical\/\S+\.ics$/.test(u)) return "formato";
+    if (!/\/private-[^/]+\//.test(u)) return "pubblico";
     window.LeiDB.save("settings", { key: "calIcs", value: u }, "user_id,key");
     await window.LeiDB.flush();
     await refresh(true);
-    return true;
+    return "ok";
   }
 
   // ---------- Elementi di un giorno (offset 0 = oggi, 1 = domani) ----------

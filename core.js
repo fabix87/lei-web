@@ -107,8 +107,9 @@
     $("#wMemo").addEventListener("click", () => pager.scrollTo({ left: 0, behavior: "smooth" }));
     $("#wdIcsSave").addEventListener("click", async () => {
       if (!window.LeiDB.signedIn) return toast("Accedi prima: apri una sezione e inserisci email e password");
-      const ok = await window.LeiGiornata.link($("#wdIcs").value);
-      if (!ok) return toast("Non sembra un indirizzo iCal di Google Calendar (finisce con .ics)");
+      const res = await window.LeiGiornata.link($("#wdIcs").value);
+      if (res === "formato") return toast("Non sembra un indirizzo iCal di Google Calendar (finisce con .ics)");
+      if (res === "pubblico") return toast("Questo è l'indirizzo pubblico: serve l'indirizzo SEGRETO, quello che contiene \"private-\"");
       $("#wdIcs").value = "";
       toast(window.LeiGiornata.linked ? "Calendario collegato" : "Salvato: il calendario arriverà alla prossima sincronizzazione");
       renderDay();
