@@ -7,7 +7,9 @@
   --light: -apple-system, "SF Pro Text", system-ui, sans-serif;
 }
 html, body { background: var(--bg); overscroll-behavior: none; }
-body { position: fixed; inset: 0; -webkit-text-size-adjust: 100%; }
+/* Aperta dall'icona con la barra di stato trasparente, l'altezza "100%" su iPhone esclude la barra di stato e lascia
+   una fascia vuota in fondo: l'altezza dello schermo intero è 100vh (senza le barre di Safari non cambia mai). */
+body { position: fixed; top: 0; left: 0; right: 0; height: 100vh; -webkit-text-size-adjust: 100%; }
 input, textarea, select { font-size: 16px !important; }   /* sotto i 16px Safari ingrandisce la pagina */
 
 /* ---------- Home ---------- */
