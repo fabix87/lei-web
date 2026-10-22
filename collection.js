@@ -472,9 +472,12 @@
     titleRow.appendChild(title);
     const find = h("button", "pill small", "Cerca online");
     find.addEventListener("click", async () => {
-      if (!it.title.trim()) { K.toast("Scrivi prima il titolo"); return; }
+      const byIsbn = it.kind !== "disco" && isIsbn(String(it.barcode || ""));
+      if (!it.title.trim() && !byIsbn) { K.toast("Scrivi prima il titolo"); return; }
       find.textContent = "Cerco…"; find.disabled = true;
-      const found = it.kind === "disco" ? await searchDiscByTitle(it.title) : await searchBookByTitle(it.title);
+      // Libro con il codice: prima per ISBN (SBN e Google con la chiave personale), poi per titolo
+      const found = it.kind === "disco" ? await searchDiscByTitle(it.title)
+        : (byIsbn && await lookupBook(it.barcode)) || (it.title.trim() ? await searchBookByTitle(it.title) : null);
       find.textContent = "Cerca online"; find.disabled = false;
       if (!found) { K.toast("Non ho trovato niente online"); return; }
       Object.keys(found).forEach(k => { if (found[k] !== undefined && found[k] !== null && found[k] !== "" && k !== "kind") it[k] = found[k]; });
