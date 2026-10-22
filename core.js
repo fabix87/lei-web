@@ -51,7 +51,7 @@
   window.LeiCore = {
     L, svg, toast, closeOverlays,
     overlayOpen: () => !!(window.LeiSections && window.LeiSections.isOpen()),
-    refreshHome: () => { tick(); renderSync(); }
+    refreshHome: () => { tick(); renderSync(); renderDay(); }
   };
 
   // ---- Saluto, ora e data ----
@@ -61,6 +61,60 @@
     $("#greeting").textContent = `${saluto}, ${C.name}`;
     $("#clock").textContent = now.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
     $("#date").textContent = now.toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long" });
+  }
+
+  // ---- Giornata: pagina a sinistra della Home e promemoria sotto il saluto (dati da giornata.js) ----
+  function renderDay() {
+    const G = window.LeiGiornata, now = new Date();
+    $("#wdWeek").textContent = now.toLocaleDateString("it-IT", { weekday: "long" });
+    $("#wdDate").textContent = now.toLocaleDateString("it-IT", { day: "numeric", month: "long" });
+    const chips = (el, list) => { el.innerHTML = ""; list.forEach(t => { const c = document.createElement("span"); c.className = "chip"; c.textContent = t; el.appendChild(c); }); };
+    const today = G.day(0);
+    chips($("#wdChips"), today.allDay);
+    G.render($("#wdTimeline"), { items: today.items });
+    // Domani: solo gli impegni del calendario (pasti e allenamento sono quelli del piano)
+    const tomorrow = G.day(1), ev = tomorrow.items.filter(it => it.kind === "event");
+    $("#wdTomorrowBox").hidden = !ev.length && !tomorrow.allDay.length;
+    chips($("#wdTomorrowChips"), tomorrow.allDay);
+    if (ev.length) G.render($("#wdTomorrow"), { items: ev, offset: 1 }); else $("#wdTomorrow").innerHTML = "";
+    $("#wdLink").hidden = G.linked !== false;
+
+    const list = $("#wMemoList");
+    list.innerHTML = "";
+    const next = G.next(3);
+    if (!next.length) list.innerHTML = '<li class="w-memo-empty">Niente in programma</li>';
+    next.forEach(it => {
+      const li = document.createElement("li");
+      li.className = `w-memo-item ${it.kind}${it.live ? " live" : ""}`;
+      li.innerHTML = `<span class="w-memo-t"></span><span class="w-memo-i">${G.svg(it.icon)}</span><span class="w-memo-l"></span>`;
+      li.querySelector(".w-memo-t").textContent = it.when;
+      li.querySelector(".w-memo-l").textContent = it.label;
+      list.appendChild(li);
+    });
+  }
+
+  function setupPager() {
+    const pager = $("#wPager"), dots = $("#wDots").children;
+    const home = () => { pager.scrollLeft = pager.clientWidth; };
+    home();
+    requestAnimationFrame(home);
+    window.addEventListener("resize", home);
+    pager.addEventListener("scroll", () => {
+      const onDay = pager.scrollLeft < pager.clientWidth / 2;
+      dots[0].classList.toggle("on", onDay);
+      dots[1].classList.toggle("on", !onDay);
+    }, { passive: true });
+    $("#wMemo").addEventListener("click", () => pager.scrollTo({ left: 0, behavior: "smooth" }));
+    $("#wdIcsSave").addEventListener("click", async () => {
+      if (!window.LeiDB.signedIn) return toast("Accedi prima: apri una sezione e inserisci email e password");
+      const ok = await window.LeiGiornata.link($("#wdIcs").value);
+      if (!ok) return toast("Non sembra un indirizzo iCal di Google Calendar (finisce con .ics)");
+      $("#wdIcs").value = "";
+      toast(window.LeiGiornata.linked ? "Calendario collegato" : "Salvato: il calendario arriverà alla prossima sincronizzazione");
+      renderDay();
+    });
+    window.addEventListener("lei-giornata", renderDay);
+    renderDay();
   }
 
   // ---- Pulsanti delle sezioni ----
@@ -114,11 +168,13 @@
 
   window.addEventListener("DOMContentLoaded", () => {
     tick();
-    setInterval(tick, 10000);
+    setInterval(() => { const m = new Date().getMinutes(); tick(); if (m !== lastMinute) { lastMinute = m; renderDay(); } }, 10000);
     setupCards();
     setupSync();
     setupEdgeSwipe();
+    setupPager();
   });
+  let lastMinute = new Date().getMinutes();
 
   // Copia per l'uso senza rete e aggiornamenti automatici
   if ("serviceWorker" in navigator && location.protocol === "https:") {

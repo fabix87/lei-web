@@ -25,13 +25,46 @@
   <div class="glow g1"></div>
   <div class="glow g2"></div>
 
-  <main class="w-home">
+  <!-- Due pagine a scorrimento come sul tablet: Giornata ← Home -->
+  <div class="w-pager" id="wPager">
+  <section class="w-page w-day" id="wDay">
+    <header class="w-day-head">
+      <div class="day-weekday" id="wdWeek"></div>
+      <div class="day-date" id="wdDate"></div>
+      <div class="day-chips" id="wdChips"></div>
+    </header>
+    <div class="card w-day-tl"><ol class="timeline" id="wdTimeline"></ol></div>
+    <div class="card w-day-tomorrow" id="wdTomorrowBox" hidden>
+      <h2>Domani</h2>
+      <div class="day-chips" id="wdTomorrowChips"></div>
+      <ol class="timeline mini" id="wdTomorrow"></ol>
+    </div>
+    <div class="card w-day-link" id="wdLink" hidden>
+      <h2>Collega Google Calendar</h2>
+      <ol class="w-steps">
+        <li>Dal computer apri <b>calendar.google.com</b> → ⚙︎ <b>Impostazioni</b>.</li>
+        <li>A sinistra, sotto "Impostazioni dei miei calendari", tocca il tuo calendario.</li>
+        <li>Scorri fino a "Integra il calendario" e copia l'<b>Indirizzo segreto in formato iCal</b>.</li>
+        <li>Incollalo qui. Resta nel tuo archivio privato: non darlo a nessuno.</li>
+      </ol>
+      <input class="field" id="wdIcs" type="url" placeholder="https://calendar.google.com/calendar/ical/…/basic.ics" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <button class="pill primary" id="wdIcsSave">Collega</button>
+    </div>
+  </section>
+
+  <main class="w-page w-home">
     <!-- Come la Home del tablet in verticale: Oggi, i 6 progetti, Conti e Collection -->
     <header class="card w-top">
       <div class="w-greeting" id="greeting">Ciao</div>
       <div class="w-clock" id="clock">--:--</div>
       <div class="w-date" id="date"></div>
     </header>
+
+    <!-- Promemoria: i prossimi impegni, pasti e allenamento; tocco → pagina Giornata -->
+    <button class="card w-memo" id="wMemo">
+      <span class="w-memo-h">Prossimi</span>
+      <ul class="w-memo-list" id="wMemoList"></ul>
+    </button>
 
     <nav class="w-grid">
       <button class="w-card" data-sec="dieta" data-icon="leaf"><span class="w-icon"></span><span class="w-name">Dieta</span></button>
@@ -50,6 +83,8 @@
       <button class="w-sync-btn" id="syncBtn"><span class="w-sync-icon"></span><span>Sincronizza</span></button>
     </footer>
   </main>
+  </div>
+  <div class="w-dots" id="wDots"><i></i><i class="on"></i></div>
 
   <div id="toast" class="toast" hidden></div>
 
@@ -57,6 +92,7 @@
   <script src="core.js"></script>
   <script src="db.js"></script>
   <script src="sync.js"></script>
+  <script src="giornata.js"></script>
   <script src="sections.js"></script>
   <script src="allenamento.js"></script>
   <script src="dieta.js"></script>

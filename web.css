@@ -11,14 +11,50 @@ body { position: fixed; inset: 0; -webkit-text-size-adjust: 100%; }
 input, textarea, select { font-size: 16px !important; }   /* sotto i 16px Safari ingrandisce la pagina */
 
 /* ---------- Home ---------- */
-.w-home { position: absolute; inset: 0; overflow-x: hidden; display: flex; flex-direction: column; gap: 14px;
-  padding: calc(var(--safe-t) + 22px) 18px calc(var(--safe-b) + 14px); overflow-y: auto; }
+/* Due pagine affiancate che scorrono a scatto: Giornata ← Home */
+.w-pager { position: absolute; inset: 0; display: flex; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory;
+  scrollbar-width: none; overscroll-behavior: contain; }
+.w-pager::-webkit-scrollbar { display: none; }
+.w-page { flex: 0 0 100%; height: 100%; scroll-snap-align: start; scroll-snap-stop: always; overflow-x: hidden; overflow-y: auto; }
+.w-dots { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(var(--safe-b) + 4px); display: flex; gap: 6px; pointer-events: none; }
+.w-dots i { width: 6px; height: 6px; border-radius: 3px; background: var(--muted); opacity: .5; transition: width .2s, background .2s; }
+.w-dots i.on { width: 16px; background: var(--gold); opacity: 1; }
+
+.w-home { display: flex; flex-direction: column; gap: 12px; padding: calc(var(--safe-t) + 18px) 18px calc(var(--safe-b) + 18px); }
 /* Come la Home del tablet in verticale: Oggi, i 6 progetti su due righe, Conti e Collection uno sotto l'altro */
 .w-top { padding: 16px 18px; }
 .w-greeting { color: var(--muted); font-size: 15px; letter-spacing: .02em; }
 .w-clock { font-family: var(--thin); font-weight: 100; font-size: clamp(60px, 9vh, 84px); line-height: 1; letter-spacing: -2px; margin: 6px 0 4px; font-variant-numeric: tabular-nums; }
 .w-date { color: var(--gold); font-size: 15px; letter-spacing: .04em; }
 .w-date::first-letter { text-transform: uppercase; }
+
+/* Promemoria sotto il saluto: i prossimi 3 impegni o pasti */
+.w-memo { display: flex; flex-direction: column; gap: 6px; text-align: left; padding: 12px 16px; flex: none; }
+.w-memo:active { background: var(--card-press); }
+.w-memo-h { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .2em; }
+.w-memo-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+.w-memo-item { display: grid; grid-template-columns: auto 18px 1fr; gap: 10px; align-items: center; font-size: 15px; }
+.w-memo-t { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; min-width: 42px; }
+.w-memo-i { width: 18px; height: 18px; color: var(--teal); display: grid; }
+.w-memo-i svg { width: 100%; height: 100%; }
+.w-memo-item.meal .w-memo-i { color: var(--gold); }
+.w-memo-item.training .w-memo-i { color: #F0A08A; }
+.w-memo-item.live .w-memo-t, .w-memo-item.live .w-memo-l { color: var(--gold); }
+.w-memo-l { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.w-memo-empty { color: var(--muted); font-size: 14px; }
+
+/* Pagina Giornata */
+.w-day { display: flex; flex-direction: column; gap: 12px; padding: calc(var(--safe-t) + 18px) 16px calc(var(--safe-b) + 22px); }
+.w-day-head { padding: 0 4px; }
+.w-day .day-date { font-size: 46px; }
+.w-day-tl { padding: 8px 14px; flex: none; }
+.w-day-tomorrow, .w-day-link { padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; }
+.w-day-tomorrow[hidden], .w-day-link[hidden] { display: none; }
+.w-day h2 { margin: 0; font-size: 11px; font-weight: 400; color: var(--muted); text-transform: uppercase; letter-spacing: .2em; }
+.w-steps { margin: 0; padding-left: 20px; font-size: 13.5px; line-height: 1.45; color: var(--muted); display: flex; flex-direction: column; gap: 4px; }
+.w-steps b { color: var(--text); font-weight: 400; }
+.w-day-link .field { width: 100%; }
+.w-day-link .pill { align-self: flex-start; }
 
 .w-grid { display: grid; grid-template-columns: repeat(3, 1fr); grid-auto-rows: minmax(92px, 1fr); gap: 10px; flex: 1 1 auto; max-height: 250px; }
 .w-card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 12px 4px;
@@ -33,6 +69,13 @@ input, textarea, select { font-size: 16px !important; }   /* sotto i 16px Safari
 .w-home .col-launch .cl-icons { gap: 16px; }
 .w-home .col-launch .cl-icons svg { width: 28px; height: 28px; }
 
+@media (max-height: 700px) {   /* iPhone SE: tutto in uno schermo */
+  .w-top { padding: 12px 16px; }
+  .w-clock { font-size: 52px; }
+  .w-grid { grid-auto-rows: minmax(76px, 1fr); }
+  .w-home .col-launch { min-height: 56px; }
+  .w-memo { padding: 10px 14px; }
+}
 .w-sync { margin-top: auto; display: flex; align-items: center; gap: 12px; padding: 6px 4px 0; }
 .w-sync-state { flex: 1; color: var(--muted); font-size: 12px; }
 .w-sync-btn { display: flex; align-items: center; gap: 8px; padding: 10px 18px; border-radius: 999px;
