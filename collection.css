@@ -117,9 +117,6 @@
   .col-launch .cl-title { font-size: 18px; letter-spacing: .14em; }
   .col-launch .cl-icons { justify-content: space-between; }
   .col-launch .cl-icons svg { width: 30px; height: 30px; }
-  /* L'ultima zona (Relax) si allunga fino in fondo, come Casa nella colonna sinistra */
-  .col-right .zones { flex: 1; }
-  .col-right .zones .zone:last-child { flex: 1; }
 }
 
 /* Lettura della copertina (OCR) */

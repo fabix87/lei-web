@@ -194,10 +194,23 @@ body.focusing .zone[data-zone="relax"] { opacity: .32; }
 
 /* Tablet in verticale */
 @media (orientation: portrait) {
-  #home { grid-template-columns: 1fr 1fr; grid-template-rows: auto 1fr; overflow-y: auto; }
-  .col-center { grid-column: 1 / -1; grid-row: 1; }
-  .claude { min-height: 320px; }
-  .col-left, .col-right { grid-row: 2; }
+  /* Home in verticale (scelta di Fabio): Oggi | Claude, i 6 progetti, Conti | Collection, le 4 zone in 2×2.
+     Colonne e contenitori delle zone "spariscono" così ogni riquadro si mette direttamente nella griglia. */
+  #home { grid-template-columns: 1fr 1fr; grid-template-rows: auto auto auto 1fr 1fr; overflow-y: auto; }
+  #home .col, #home .zones { display: contents; }
+  #home .today { grid-area: 1 / 1; }
+  .claude { grid-area: 1 / 2; min-height: 0; max-height: none; }
+  .claude-title { margin-top: 110px; font-size: 28px; }
+  .claude-hint { padding: 0 14px; text-align: center; }
+  .projects { grid-area: 2 / 1 / 3 / -1; }
+  #contiBtn { grid-area: 3 / 1; }
+  #collectionBtn { grid-area: 3 / 2; }
+  .zone[data-zone="lavoro"] { grid-area: 4 / 1; }
+  .zone[data-zone="corpo"] { grid-area: 4 / 2; }
+  .zone[data-zone="relax"] { grid-area: 5 / 1; }
+  .zone[data-zone="casa"] { grid-area: 5 / 2; }
+  #home .zone { display: flex; flex-direction: column; }
+  #home .zone .items { grid-template-columns: repeat(4, 1fr); flex: 1; align-content: center; padding-bottom: 18px; }
   #pg-giornata { grid-template-columns: 1fr; grid-template-rows: 1fr auto; }
   .day-side { flex-direction: row; flex-wrap: wrap; }
   .day-side > * { flex: 1 1 45%; }
