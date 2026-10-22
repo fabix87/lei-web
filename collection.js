@@ -221,6 +221,111 @@
     return hit ? (hit.volumeInfo.imageLinks.thumbnail || hit.volumeInfo.imageLinks.smallThumbnail) : null;
   }
 
+  // ---------- Scegli dati e copertina ----------
+  // Proposte di tutti i cataloghi per ISBN e per titolo+autore: SBN, Google Libri, Open Library. Nessuna viene
+  // applicata da sola: Fabio sceglie i dati e/o la copertina di ognuna.
+  const gbCandidate = x => {
+    const v = x.volumeInfo || {}, img = v.imageLinks && (v.imageLinks.thumbnail || v.imageLinks.smallThumbnail);
+    return {
+      src: "Google Libri", title: v.title ? v.title + (v.subtitle ? ": " + v.subtitle : "") : "", creator: (v.authors || []).join(", "),
+      publisher: v.publisher || "", year: yearOf(v.publishedDate), pages: v.pageCount || null, description: stripHtml(v.description),
+      cover_url: img ? img.replace("http:", "https:").replace("&edge=curl", "") : null
+    };
+  };
+  async function candidates(it) {
+    const isbn = isIsbn(String(it.barcode || "")) ? String(it.barcode) : "";
+    const t = String(it.title || "").split(":")[0].trim();
+    const surname = norm(String(it.creator || "").split(/[\s,]+/).filter(Boolean).pop() || "");
+    const tq = t ? `intitle:"${t}"` + (surname ? ` inauthor:${surname}` : "") : "";
+    const [gi, gt, oi, os, srv, sd] = await Promise.all([
+      isbn ? getJSON(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}&maxResults=3${gbKey()}`) : null,
+      tq ? getJSON(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(tq)}&maxResults=6${gbKey()}`) : null,
+      isbn ? getJSON(`https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&format=json&jscmd=data`) : null,
+      t ? getJSON(`https://openlibrary.org/search.json?limit=5&fields=title,subtitle,author_name,first_publish_year,cover_i,publisher,number_of_pages_median&q=${encodeURIComponent(t + (surname ? " " + surname : ""))}`) : null,
+      isbn && DB.signedIn ? DB.fn("libri", "isbn=" + isbn) : null,
+      isbn && L.httpGet ? getJSON(SBN(isbn)) : null
+    ]);
+    const out = [];
+    const sbn = (srv && srv.sbn) || sd;
+    ((sbn && sbn.briefRecords) || []).forEach(r => { const c = sbnRecord({ briefRecords: [r] }, isbn); if (c) out.push(Object.assign({ src: "SBN (biblioteche)" }, c)); });
+    [gi, srv && srv.google, gt].forEach(j => ((j && j.items) || []).forEach(x => out.push(gbCandidate(x))));
+    const o = oi && oi["ISBN:" + isbn];
+    if (o) out.push({
+      src: "Open Library", title: o.title || "", creator: (o.authors || []).map(a => a.name).join(", "),
+      publisher: (o.publishers && o.publishers[0] && o.publishers[0].name) || "", year: yearOf(o.publish_date),
+      pages: o.number_of_pages || null, cover_url: o.cover ? (o.cover.large || o.cover.medium) : null
+    });
+    ((os && os.docs) || []).forEach(d => out.push({
+      src: "Open Library", title: d.title + (d.subtitle ? ": " + d.subtitle : ""), creator: (d.author_name || []).join(", "),
+      publisher: (d.publisher || [])[0] || "", year: d.first_publish_year || null, pages: d.number_of_pages_median || null,
+      cover_url: d.cover_i ? `https://covers.openlibrary.org/b/id/${d.cover_i}-L.jpg` : null
+    }));
+    const seen = new Set();   // doppioni: stessi dati e stessa copertina
+    return out.filter(c => {
+      const k = [c.src, norm(c.title), norm(c.creator), norm(c.publisher), c.year, c.cover_url].join("|");
+      if (!c.title || seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
+  }
+
+  // ready: proposte già trovate (dopo una scelta il pannello resta aperto, senza cercare di nuovo)
+  function openPicker(it, ready) {
+    const box = ui.sheet.querySelector(".col-box");
+    if (!box || box.querySelector(".col-pick")) return;
+    const p = h("div", "col-pick");
+    const head = h("div", "col-pick-head");
+    const close = h("button", "col-close", "✕");
+    close.setAttribute("aria-label", "Chiudi le proposte");
+    close.addEventListener("click", () => p.remove());
+    head.append(h("h3", "", "Proposte dai cataloghi"), close);
+    const list = h("div", "col-pick-list");
+    list.appendChild(h("div", "col-pick-wait", "Cerco in SBN, Google Libri e Open Library…"));
+    p.append(head, h("p", "col-pick-hint", "Scegli i dati giusti e, a parte, la copertina giusta. Poi premi Salva nella scheda."), list);
+    box.appendChild(p);
+    box.scrollTop = 0;
+    (ready ? Promise.resolve(ready) : candidates(it)).then(cs => {
+      if (!p.isConnected) return;
+      list.innerHTML = "";
+      if (!cs.length) { list.appendChild(h("div", "col-pick-wait", quotaHit ? "Google Libri non risponde e gli altri cataloghi non lo conoscono: correggi a mano o fotografa la copertina." : "Nessun catalogo lo conosce: correggi a mano o fotografa la copertina.")); return; }
+      cs.forEach(c => {
+        const row = h("div", "col-pick-row");
+        const pic = h("div", "col-pick-cover");
+        if (c.cover_url) {
+          const img = h("img");
+          img.alt = "";
+          img.addEventListener("load", () => { if (img.naturalWidth < 5) { pic.classList.add("none"); useCover.remove(); } });
+          img.addEventListener("error", () => { pic.classList.add("none"); useCover.remove(); });
+          img.src = c.cover_url;
+          pic.appendChild(img);
+        } else pic.classList.add("none");
+        const info = h("div", "col-pick-info");
+        info.append(h("div", "col-pick-src", c.src), h("div", "col-pick-t", c.title),
+          h("div", "col-pick-m", [c.creator, c.publisher, c.year, c.pages ? c.pages + " pagine" : ""].filter(Boolean).join(" · ")));
+        const btns = h("div", "col-pick-btns");
+        const useData = h("button", "pill small", "Usa i dati");
+        useData.addEventListener("click", () => {
+          ["title", "creator", "publisher", "year", "pages", "description"].forEach(k => { if (c[k]) it[k] = c[k]; });
+          reopenWith(it);
+          openPicker(sheetItem.it, cs);
+          K.toast("Dati presi da " + c.src + ": scegli la copertina o chiudi e premi Salva");
+        });
+        const useCover = h("button", "pill small", "Usa la copertina");
+        useCover.addEventListener("click", () => {
+          Object.assign(it, { cover_url: c.cover_url, cover_path: null, _preview: null, _blob: null });
+          reopenWith(it);
+          openPicker(sheetItem.it, cs);
+          K.toast("Copertina presa da " + c.src + ": chiudi le proposte e premi Salva");
+        });
+        btns.appendChild(useData);
+        if (c.cover_url) btns.appendChild(useCover);
+        info.appendChild(btns);
+        row.append(pic, info);
+        list.appendChild(row);
+      });
+    });
+  }
+
   // want: titolo letto dalla copertina. Se c'è, chiede più risultati e tiene quello col titolo più simile (non il primo)
   async function searchBookByTitle(q, want) {
     const n = want ? 8 : 1;
@@ -484,6 +589,22 @@
     const shot = h("button", "pill small", "Fotografa copertina");
     shot.addEventListener("click", () => openScanner({ mode: "photo", onPhoto: (blob, url) => { it._blob = blob; it._preview = url; redrawCover(); } }));
     left.append(coverWrap, shot);
+    // Libri e fumetti: proposte dai cataloghi da scegliere a mano (come "Scarica metadati" di Calibre)
+    if (it.kind === "libro" || it.kind === "fumetto") {
+      const pick = h("button", "pill small", "Scegli dati e copertina");
+      pick.addEventListener("click", () => openPicker(it));
+      left.appendChild(pick);
+    }
+    // Togli la copertina (sbagliata): poi se ne sceglie un'altra o si fotografa. Si salva con "Salva".
+    if (it.cover_url || it.cover_path || it._preview) {
+      const rm = h("button", "pill small", "Togli copertina");
+      rm.addEventListener("click", () => {
+        Object.assign(it, { cover_url: null, cover_path: null, _preview: null, _blob: null });
+        reopenWith(it);
+        K.toast("Copertina tolta: premi Salva per confermare");
+      });
+      left.appendChild(rm);
+    }
     // Libro senza copertina e senza chiave Google personale: proposta di inserirla (una volta sola)
     if (it.kind === "libro" && !gbKey() && !it.cover_url && !it.cover_path && !it._preview) {
       const kb = h("button", "pill small", "Copertine da Google");
