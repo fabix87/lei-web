@@ -19,7 +19,9 @@ window.LEI_CONFIG = {
       { label: "Dieta", icon: "leaf", url: "", section: "dieta" },
       { label: "Allenamento", icon: "dumbbell", url: "", section: "allenamento" },
       { label: "Dispensa", icon: "box", url: "", section: "dispensa" },
-      { label: "Scrittura", icon: "pen", url: "", section: "scrittura" }
+      { label: "Scrittura", icon: "pen", url: "", section: "scrittura" },
+      { label: "Cerca Casa", icon: "house", url: "", section: "casa" },
+      { label: "Cerca Lavoro", icon: "briefcase", url: "", section: "lavoro" }
     ]
   },
 

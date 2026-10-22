@@ -180,6 +180,11 @@
   function insert(table, row) {
     return enqueue({ method: "POST", path: table, body: [row], prefer: "return=minimal" });
   }
+  // Molte righe nuove in una volta; quelle che esistono già (stesse colonne di onConflict) vengono saltate
+  function insertMany(table, rows, onConflict) {
+    if (!rows.length) return Promise.resolve();
+    return enqueue({ method: "POST", path: `${table}?on_conflict=${onConflict}`, body: rows, prefer: "resolution=ignore-duplicates,return=minimal" });
+  }
   // Modifica delle righe che rispondono al filtro (es. "id=eq.12")
   function update(table, filter, values) {
     return enqueue({ key: table + "?" + filter, method: "PATCH", path: `${table}?${filter}`, body: values, prefer: "return=minimal" });
@@ -213,7 +218,7 @@
     get email() { return session ? session.email : ""; },
     get online() { return online; },
     get pending() { return outbox.length; },
-    signIn, signOut, load, peek, save, insert, update, flush, signPhotos, uploadPhoto, uid, fn,
+    signIn, signOut, load, peek, save, insert, insertMany, update, flush, signPhotos, uploadPhoto, uid, fn,
     onChange(fn) { listeners.add(fn); return () => listeners.delete(fn); }
   };
 })();
