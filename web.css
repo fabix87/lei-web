@@ -52,7 +52,9 @@ input, textarea, select { font-size: 16px !important; }   /* sotto i 16px Safari
 .w-day .day-date { font-size: 46px; }
 .w-day-tl { padding: 8px 14px; flex: none; }
 .w-day-tomorrow, .w-day-link { padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; }
-.w-day-tomorrow[hidden], .w-day-link[hidden] { display: none; }
+.w-day-link[hidden] { display: none; }
+.w-day-tomorrow { flex: 1 0 auto; }   /* occupa tutto lo spazio rimasto fino in fondo */
+.w-day-tomorrow .timeline.mini .tl-item { padding: 6px 0; font-size: 15px; }
 .w-day h2 { margin: 0; font-size: 11px; font-weight: 400; color: var(--muted); text-transform: uppercase; letter-spacing: .2em; }
 .w-steps { margin: 0; padding-left: 20px; font-size: 13.5px; line-height: 1.45; color: var(--muted); display: flex; flex-direction: column; gap: 4px; }
 .w-steps b { color: var(--text); font-weight: 400; }

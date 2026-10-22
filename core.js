@@ -83,11 +83,10 @@
     const today = G.day(0);
     chips($("#wdChips"), today.allDay);
     G.render($("#wdTimeline"), { items: today.items });
-    // Domani: solo gli impegni del calendario (pasti e allenamento sono quelli del piano)
-    const tomorrow = G.day(1), ev = tomorrow.items.filter(it => it.kind === "event");
-    $("#wdTomorrowBox").hidden = !ev.length && !tomorrow.allDay.length;
+    // Domani: la giornata intera (impegni, pasti, allenamento) nel riquadro che arriva fino in fondo
+    const tomorrow = G.day(1);
     chips($("#wdTomorrowChips"), tomorrow.allDay);
-    if (ev.length) G.render($("#wdTomorrow"), { items: ev, offset: 1 }); else $("#wdTomorrow").innerHTML = "";
+    G.render($("#wdTomorrow"), { items: tomorrow.items, offset: 1 });
     $("#wdLink").hidden = G.linked !== false;
 
     const list = $("#wMemoList");
