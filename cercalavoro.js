@@ -1,7 +1,7 @@
 // Sezione "Cerca Lavoro": annunci coerenti con il profilo professionale (artifact "Annunci ottobre 2026", app Incastro).
-// Punteggio sul profilo (come Incastro: src/scoring), stati nuovo → salvato → candidato o scartato, "Incolla annuncio"
-// e "Aggiorna ricerca" sulle API ufficiali di Adzuna e Jooble tramite la funzione `job-search` dell'archivio
-// (le chiavi stanno solo lì). Mai lettura delle pagine di LinkedIn o Indeed: quegli annunci si incollano.
+// Punteggio sul profilo (come Incastro: src/scoring), stati nuovo → salvato → candidato o scartato, "Incolla annuncio".
+// Gli annunci nuovi arrivano quando Fabio chiede a Claude, dal computer, di aggiornare la ricerca (docs/aggiorna-lavoro.md,
+// funzione `lavoro-import`); in più "Ricerca automatica" con Jooble tramite la funzione `job-search`, se c'è la chiave.
 (function () {
   const S = window.LeiSections, DB = window.LeiDB, K = window.LeiCore, D = S.D;
 
@@ -211,7 +211,7 @@
     });
     const upd = h("button", "pill small gold cc-upd", searching ? "Cerco…" : "Aggiorna ricerca");
     upd.disabled = searching;
-    upd.addEventListener("click", runSearch);
+    upd.addEventListener("click", openUpdateInfo);
     const paste = h("button", "pill small", "+ Incolla");
     paste.addEventListener("click", openPaste);
     const prof = h("button", "pill small", "Profilo");
@@ -333,9 +333,20 @@
   }
 
   function openKeysInfo() {
-    const box = sheet("Chiavi da inserire");
-    box.appendChild(h("p", null, "Per cercare da solo, Lei usa Adzuna e Jooble: due servizi che permettono la ricerca alle app, con chiavi gratuite per uso personale. Le chiavi si inseriscono una volta nell'archivio (Supabase → Edge Functions → Secrets): ADZUNA_APP_ID, ADZUNA_APP_KEY e JOOBLE_KEY. Chiedi a Claude di guidarti."));
+    const box = sheet("Ricerca automatica non attiva");
+    box.appendChild(h("p", null, "La ricerca automatica usa Jooble, con una chiave gratuita che si chiede dal loro sito (it.jooble.org/api/about) e si salva nell'archivio: Supabase → Edge Functions → Secrets, nome JOOBLE_KEY. Adzuna invece è a pagamento e non la usiamo."));
+    box.appendChild(h("p", null, "Intanto gli annunci nuovi arrivano chiedendo a Claude dal computer: «aggiorna la ricerca lavoro»."));
     rowButtons(box, [["Ho capito", "primary", closeSheet]]);
+  }
+
+  function openUpdateInfo() {
+    const box = sheet("Aggiorna ricerca");
+    const l = data.last;
+    box.appendChild(h("p", null, l ? `Ultima ricerca: ${D.label(D.parse(l.date), { day: "numeric", month: "long", year: "numeric" })}${l.sources ? " (" + l.sources + ")" : ""}, ${l.added} annunci nuovi.` : "Ultima ricerca: quella di partenza, ottobre 2026."));
+    box.appendChild(h("p", null, "Per aggiornare chiedi a Claude, dal Mac o dal PC (Claude Code nella cartella lei-launcher):"));
+    box.appendChild(h("p", "cc-quote", "«aggiorna la ricerca lavoro»"));
+    box.appendChild(h("p", null, "Claude cerca su LinkedIn, Indeed e gli altri portali, legge ogni annuncio, salta quelli che hai scartato e quelli contro le tue regole, e li aggiunge qui con un suo commento. Li trovi in «Nuovi», qui e sull'iPhone."));
+    rowButtons(box, [["Ricerca automatica (Jooble)", null, () => { closeSheet(); runSearch(); }], ["Ho capito", "primary", closeSheet]]);
   }
 
   function openPaste() {
