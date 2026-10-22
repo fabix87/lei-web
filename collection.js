@@ -179,7 +179,7 @@
       pages: (v && v.pageCount) || (o && o.number_of_pages) || null,
       description: stripHtml(v && v.description),
       cover_url: (o && o.cover && (o.cover.large || o.cover.medium)) ||
-        (gbCover ? gbCover.replace("http:", "https:").replace("&edge=curl", "") : null)
+        (gbCover ? gbCover.replace("http:", "https:").replace("&edge=curl", "") : null) || (srv && srv.cover) || null
     };
   }
 
@@ -806,7 +806,7 @@
       const st = c.statusSel;
       closeScanner();
       openSheet(blank(Object.assign({ status: st, barcode: code }, found || {}, { kind: (found && found.kind) || c.kindSel || "libro" })),
-        found ? "Trovato online: controlla e aggiungi" : notFoundMsg());
+        found ? "Trovato online: controlla i dati e premi «Aggiungi» in fondo" : notFoundMsg());
       return;
     }
     if (!c) {
@@ -815,7 +815,7 @@
       K.toast("Cerco " + code + "…");
       const found = await lookup(code, kind);
       openSheet(blank(Object.assign({ barcode: code }, found || {}, { kind: (found && found.kind) || kind || "libro" })),
-        found ? "Trovato online: controlla e aggiungi" : notFoundMsg());
+        found ? "Trovato online: controlla i dati e premi «Aggiungi» in fondo" : notFoundMsg());
       return;
     }
     // Raffica: aggiunge da solo e passa al prossimo
