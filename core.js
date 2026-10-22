@@ -4,6 +4,17 @@
   const C = window.LEI_CONFIG;
   const $ = s => document.querySelector(s);
 
+  // ---- Altezza dello schermo: aperta dall'icona, iOS può dare alla pagina meno dello schermo intero (fascia vuota
+  // in fondo). In quel caso la pagina prende l'altezza vera dello schermo (navigator.standalone = aperta dall'icona).
+  function fitScreen() {
+    if (!navigator.standalone) return;
+    const land = matchMedia("(orientation: landscape)").matches;
+    const h = land ? Math.min(screen.width, screen.height) : Math.max(screen.width, screen.height);
+    document.documentElement.style.setProperty("--app-h", h + "px");
+  }
+  fitScreen();
+  window.addEventListener("resize", fitScreen);
+
   // ---- Ponte: sul tablet è Java, qui fa quello che può fare Safari ----
   const L = {
     launch: () => false,
