@@ -32,11 +32,26 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 #track { display: flex; height: 100%; will-change: transform; }
 .page { flex: 0 0 100vw; width: 100vw; height: 100%; padding: 34px 20px 60px; position: relative; overflow: hidden; }
 
+/* Home (scelta di Fabio, uguale nei due orientamenti): Oggi | Claude, i 6 progetti, Conti | Collection, le 4 zone.
+   Colonne e contenitori delle zone "spariscono" così ogni riquadro si mette direttamente nella griglia (4 colonne). */
 #home {
   display: grid;
-  grid-template-columns: 1fr 1.45fr 1fr;
-  gap: 14px;
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: auto auto auto 1fr;
+  gap: 12px;
 }
+#home .col, #home .zones { display: contents; }
+#home .today { grid-area: 1 / 1 / 2 / 3; }
+#home .claude { grid-area: 1 / 3 / 2 / 5; }
+#home .projects { grid-area: 2 / 1 / 3 / 5; grid-template-columns: repeat(6, 1fr); }
+#contiBtn { grid-area: 3 / 1 / 4 / 3; }
+#collectionBtn { grid-area: 3 / 3 / 4 / 5; }
+.zone[data-zone="lavoro"] { grid-area: 4 / 1; }
+.zone[data-zone="corpo"] { grid-area: 4 / 2; }
+.zone[data-zone="relax"] { grid-area: 4 / 3; }
+.zone[data-zone="casa"] { grid-area: 4 / 4; }
+#home .zone { display: flex; flex-direction: column; min-height: 0; }
+#home .zone .items { grid-template-columns: repeat(4, 1fr); flex: 1; align-content: center; padding-bottom: 14px; }
 .col { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
 
 .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; }
@@ -52,11 +67,8 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .events .tomorrow { color: var(--muted); font-size: 11px; margin-top: 4px; text-transform: uppercase; letter-spacing: .14em; }
 
 .zones { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
-.col-left .zones { flex: 1; }
-.col-left .zone { flex: 1; }
 .zone h2 { margin: 0 0 8px; font-size: 11px; font-weight: 400; color: var(--muted); text-transform: uppercase; letter-spacing: .2em; }
 .zone .items { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
-.col-left .zone .items { grid-template-columns: repeat(3, 1fr); }
 .item { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 6px 2px; border-radius: 14px; font-size: 12px; color: var(--text); text-align: center; }
 .item:active { background: var(--card-press); }
 .item img, .item .glyph { width: 40px; height: 40px; border-radius: 12px; }
@@ -66,14 +78,13 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .app-grid .item { padding: 8px 2px; }
 
 /* Claude al centro: onda sonora */
-.col-center { justify-content: center; }
 .claude {
-  position: relative; flex: 1; max-height: 460px; overflow: hidden;
+  position: relative; min-height: 0; overflow: hidden;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
   border-radius: 28px; background: rgba(10, 26, 38, 0.55); border: 1px solid var(--line);
 }
 .claude canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
-.claude-title { position: relative; margin-top: 170px; font-family: var(--thin); font-weight: 100; font-size: 34px; letter-spacing: .02em; }
+.claude-title { position: relative; margin-top: 110px; font-family: var(--thin); font-weight: 100; font-size: 34px; letter-spacing: .02em; }
 .claude-hint { position: relative; color: var(--muted); font-size: 12px; letter-spacing: .04em; }
 
 .projects { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
@@ -194,23 +205,15 @@ body.focusing .zone[data-zone="relax"] { opacity: .32; }
 
 /* Tablet in verticale */
 @media (orientation: portrait) {
-  /* Home in verticale (scelta di Fabio): Oggi | Claude, i 6 progetti, Conti | Collection, le 4 zone in 2×2.
-     Colonne e contenitori delle zone "spariscono" così ogni riquadro si mette direttamente nella griglia. */
-  #home { grid-template-columns: 1fr 1fr; grid-template-rows: auto auto auto 1fr 1fr; overflow-y: auto; }
-  #home .col, #home .zones { display: contents; }
-  #home .today { grid-area: 1 / 1; }
-  .claude { grid-area: 1 / 2; min-height: 0; max-height: none; }
-  .claude-title { margin-top: 110px; font-size: 28px; }
+  /* Home in verticale: le 4 zone in 2×2 */
+  #home { grid-template-rows: auto auto auto 1fr 1fr; overflow-y: auto; }
+  #home .projects { grid-template-columns: repeat(3, 1fr); }
+  .zone[data-zone="lavoro"] { grid-area: 4 / 1 / 5 / 3; }
+  .zone[data-zone="corpo"] { grid-area: 4 / 3 / 5 / 5; }
+  .zone[data-zone="relax"] { grid-area: 5 / 1 / 6 / 3; }
+  .zone[data-zone="casa"] { grid-area: 5 / 3 / 6 / 5; }
+  .claude-title { font-size: 28px; }
   .claude-hint { padding: 0 14px; text-align: center; }
-  .projects { grid-area: 2 / 1 / 3 / -1; }
-  #contiBtn { grid-area: 3 / 1; }
-  #collectionBtn { grid-area: 3 / 2; }
-  .zone[data-zone="lavoro"] { grid-area: 4 / 1; }
-  .zone[data-zone="corpo"] { grid-area: 4 / 2; }
-  .zone[data-zone="relax"] { grid-area: 5 / 1; }
-  .zone[data-zone="casa"] { grid-area: 5 / 2; }
-  #home .zone { display: flex; flex-direction: column; }
-  #home .zone .items { grid-template-columns: repeat(4, 1fr); flex: 1; align-content: center; padding-bottom: 18px; }
   #pg-giornata { grid-template-columns: 1fr; grid-template-rows: 1fr auto; }
   .day-side { flex-direction: row; flex-wrap: wrap; }
   .day-side > * { flex: 1 1 45%; }

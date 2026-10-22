@@ -100,6 +100,5 @@
   .fn-cat { grid-template-columns: 130px 1fr 70px; }
 }
 
-/* Pulsante "Conti" della Home del tablet: colonna sinistra fra Oggi e Casa (simmetrico a COLLECTION) */
+/* Pulsante "Conti" della Home del tablet, accanto a COLLECTION */
 #contiBtn .cl-icons { color: #5FB9C4; }
-@media (orientation: portrait) { #contiBtn .cl-icons { justify-content: flex-end; gap: 22px; } }

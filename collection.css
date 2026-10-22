@@ -1,12 +1,12 @@
-/* ---------- Pulsante COLLECTION nella Home (colonna destra, sopra le zone) ---------- */
-/* Occupa tutto lo spazio sopra le zone Lavoro, Corpo e Relax */
-.col-launch { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 10px; text-align: left; padding: 14px 18px;
+/* ---------- Pulsanti COLLECTION e Conti nella Home (affiancati sotto i progetti) ---------- */
+/* Scritta a sinistra e icone sulla stessa riga */
+.col-launch { min-height: 0; display: flex; flex-direction: row; align-items: center; gap: 12px; text-align: left; padding: 14px 18px;
   border-color: rgba(242,198,109,.35); background: linear-gradient(100deg, rgba(242,198,109,.12), rgba(16,36,50,.62) 60%); }
 .col-launch:active { background: var(--card-press); }
-.cl-title { font-family: var(--thin); font-weight: 100; font-size: 26px; letter-spacing: .22em; text-transform: uppercase; line-height: 1.1; }
-/* Seconda riga: libro, DVD, gioco, vinile, distribuiti su tutto lo spazio rimasto */
-.cl-icons { flex: 1; display: flex; align-items: center; justify-content: space-around; color: var(--gold); }
-.cl-icons svg { width: 44px; height: 44px; }
+.cl-title { font-family: var(--thin); font-weight: 100; font-size: 20px; letter-spacing: .18em; text-transform: uppercase; line-height: 1.1; }
+/* Libro, DVD, gioco, vinile (o le icone dei Conti) a destra della scritta */
+.cl-icons { flex: 1; display: flex; align-items: center; justify-content: flex-end; gap: 22px; color: var(--gold); }
+.cl-icons svg { width: 32px; height: 32px; }
 
 /* ---------- Sezione ---------- */
 .sec-col { padding-bottom: 0; gap: 10px; }
@@ -112,11 +112,6 @@
   .col-grid { grid-template-columns: repeat(3, 1fr); }
   .sec-col .sec-head { flex-wrap: wrap; }
   .col-search { order: 3; flex: 1 1 100%; }
-  /* In verticale la colonna è più stretta: scritta e icone sulla stessa riga, riquadro basso che non si schiaccia */
-  .col-launch { flex: 0 0 auto; min-height: 0; flex-direction: row; align-items: center; gap: 12px; padding: 14px 16px; }
-  .col-launch .cl-title { font-size: 18px; letter-spacing: .14em; }
-  .col-launch .cl-icons { justify-content: space-between; }
-  .col-launch .cl-icons svg { width: 30px; height: 30px; }
 }
 
 /* Lettura della copertina (OCR) */
