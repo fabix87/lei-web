@@ -97,15 +97,5 @@
   .fn-cat { grid-template-columns: 130px 1fr 70px; }
 }
 
-/* Pulsante "Conti" della Home del tablet, a sinistra di COLLECTION */
-.launch-row { display: flex; gap: 12px; flex: 1; min-height: 0; }
-.launch-row .col-launch { flex: 1; min-width: 0; }
-.launch-row #contiBtn { flex: 0 0 34%; }
-.launch-row #contiBtn .cl-title { font-size: 22px; letter-spacing: .16em; }
+/* Pulsante "Conti" della Home del tablet: colonna sinistra fra Oggi e Casa (simmetrico a COLLECTION) */
 #contiBtn .cl-icons { color: #5FB9C4; }
-@media (orientation: portrait) {
-  .launch-row { flex: 0 0 auto; }
-  .launch-row #contiBtn { flex: 0 0 auto; }
-  .launch-row #contiBtn .cl-icons { display: none; }
-  .launch-row #contiBtn .cl-title { font-size: 16px; }
-}

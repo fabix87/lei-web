@@ -1,5 +1,5 @@
 // Sezione "Conti": il mese in corso (voci da pagare e già pagate), le previsioni dei due mesi successivi e
-// "La situazione" (conti, debiti, arretrati, andamento, categorie, note). Si apre con un PIN a 4 cifre.
+// "La situazione" (conti, debiti, arretrati, andamento, categorie, note). Si apre con un PIN a 6 cifre (quelli vecchi a 4 restano validi finché non si cambiano).
 // I numeri stanno solo nell'archivio privato (fin_months, fin_items, settings 'finSituazione'): il codice è pubblico
 // nella web app. Gli estratti conto si caricano da qui; li legge Claude quando Fabio chiede "aggiorna i conti"
 // (docs/aggiorna-conti.md, funzione conti-import).
@@ -329,19 +329,22 @@
     const box = h("div", "sheet-box fn-pin");
     let mode = !data.pin ? "new" : change ? "change" : "unlock", first = "", entered = "";
     const title = h("h3"), msg = h("p"), dots = h("div", "fn-dots");
+    // Il PIN salvato è "6:<impronta>"; senza prefisso è un vecchio PIN a 4 cifre
+    const saved = () => String(data.pin || "").replace(/^6:/, "");
+    const len = () => (mode === "unlock" && !String(data.pin).startsWith("6:") ? 4 : 6);
     const setMode = () => {
       title.textContent = mode === "unlock" ? "Conti" : mode === "confirm" ? "Ripeti il PIN" : "Scegli un PIN";
-      msg.textContent = mode === "unlock" ? "Inserisci il PIN a 4 cifre." : mode === "confirm" ? "Scrivilo di nuovo per conferma." : "4 cifre: serve ad aprire i Conti, su tablet e iPhone.";
+      msg.textContent = mode === "unlock" ? `Inserisci il PIN a ${len()} cifre.` : mode === "confirm" ? "Scrivilo di nuovo per conferma." : "6 cifre: serve ad aprire i Conti, su tablet e iPhone.";
     };
-    const paint = () => { dots.innerHTML = ""; for (let n = 0; n < 4; n++) dots.appendChild(h("i", n < entered.length ? "on" : "")); };
+    const paint = () => { dots.innerHTML = ""; for (let n = 0; n < len(); n++) dots.appendChild(h("i", n < entered.length ? "on" : "")); };
     const done = async () => {
       if (mode === "unlock") {
-        if (await pinHash(entered) === data.pin) { unlockedUntil = Date.now() + UNLOCK_MS; closeSheet(); render(); }
+        if (await pinHash(entered) === saved()) { unlockedUntil = Date.now() + UNLOCK_MS; closeSheet(); render(); }
         else { msg.textContent = "PIN sbagliato, riprova."; K.L.vibrate && K.L.vibrate(80); }
       } else if (mode === "new" || mode === "change") { first = entered; mode = "confirm"; setMode(); }
       else if (mode === "confirm") {
         if (entered === first) {
-          data.pin = await pinHash(entered);
+          data.pin = "6:" + await pinHash(entered);
           DB.save("settings", { key: "finPin", value: data.pin }, "user_id,key");
           unlockedUntil = Date.now() + UNLOCK_MS;
           K.toast("PIN salvato");
@@ -358,9 +361,9 @@
       if (!k) b.disabled = true;
       b.addEventListener("click", () => {
         if (k === "⌫") entered = entered.slice(0, -1);
-        else if (entered.length < 4) entered += k;
+        else if (entered.length < len()) entered += k;
         paint();
-        if (entered.length === 4) setTimeout(done, 120);
+        if (entered.length === len()) setTimeout(done, 120);
       });
       pad.appendChild(b);
     });
