@@ -140,20 +140,42 @@
     return /^97[89]\d{10}$/.test(code) || /^\d{9}[\dX]$/i.test(code);
   }
 
+  // Catalogo SBN delle biblioteche italiane (gratuito, senza chiave): "La volta giusta / Lorenza Gentile",
+  // "Gentile, Lorenza", "Milano : Feltrinelli, 2026". Sull'iPhone passa dalla funzione "libri" (niente CORS).
+  const SBN = isbn => `https://opac.sbn.it/opacmobilegw/search.json?isbn=${isbn}`;
+  function sbnRecord(j, isbn) {
+    const list = (j && j.briefRecords) || [];
+    const r = list.find(x => String(x.isbn || "").replace(/[^0-9X]/gi, "") === isbn) || list[0];
+    if (!r || !r.titolo) return null;
+    const name = String(r.autorePrincipale || "").replace(/<[^>]*>/g, "").trim();
+    const parts = name.split(/,\s*/);
+    const pub = String(r.pubblicazione || "");
+    return {
+      title: r.titolo.split(" / ")[0].replace(/\s+:\s+/g, ": ").trim(),
+      creator: parts.length === 2 ? `${parts[1]} ${parts[0]}` : name,
+      publisher: (pub.split(" : ")[1] || "").replace(/,?\s*\[?\d{4}.*$/, "").trim(),
+      year: yearOf(pub)
+    };
+  }
+
   async function lookupBook(isbn) {
-    const [gb, ol] = await Promise.all([
+    const [gb, ol, srv, sbnDirect] = await Promise.all([
       getJSON(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}&maxResults=1${gbKey()}`),
-      getJSON(`https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&format=json&jscmd=data`)
+      getJSON(`https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&format=json&jscmd=data`),
+      DB.signedIn ? DB.fn("libri", "isbn=" + isbn) : null,   // SBN (+ Google con la chiave personale, se c'è)
+      L.httpGet ? getJSON(SBN(isbn)) : null                  // sul tablet SBN si interroga anche da qui
     ]);
-    const v = gb && gb.items && gb.items[0] && gb.items[0].volumeInfo;
+    const first = j => j && j.items && j.items[0] && j.items[0].volumeInfo;
+    const v = first(gb) || first(srv && srv.google);
     const o = ol && ol["ISBN:" + isbn];
-    if (!v && !o) return null;
+    const s = sbnRecord(srv && srv.sbn, isbn) || sbnRecord(sbnDirect, isbn);
+    if (!v && !o && !s) return null;
     const gbCover = v && v.imageLinks && (v.imageLinks.thumbnail || v.imageLinks.smallThumbnail);
     return {
-      title: (v && (v.title + (v.subtitle ? ": " + v.subtitle : ""))) || (o && o.title) || "",
-      creator: (v && v.authors && v.authors.join(", ")) || (o && o.authors && o.authors.map(a => a.name).join(", ")) || "",
-      publisher: (v && v.publisher) || (o && o.publishers && o.publishers[0] && o.publishers[0].name) || "",
-      year: yearOf(v && v.publishedDate) || yearOf(o && o.publish_date),
+      title: (v && (v.title + (v.subtitle ? ": " + v.subtitle : ""))) || (s && s.title) || (o && o.title) || "",
+      creator: (v && v.authors && v.authors.join(", ")) || (s && s.creator) || (o && o.authors && o.authors.map(a => a.name).join(", ")) || "",
+      publisher: (v && v.publisher) || (s && s.publisher) || (o && o.publishers && o.publishers[0] && o.publishers[0].name) || "",
+      year: yearOf(v && v.publishedDate) || (s && s.year) || yearOf(o && o.publish_date),
       pages: (v && v.pageCount) || (o && o.number_of_pages) || null,
       description: stripHtml(v && v.description),
       cover_url: (o && o.cover && (o.cover.large || o.cover.medium)) ||
