@@ -216,7 +216,9 @@
     paste.addEventListener("click", openPaste);
     const prof = h("button", "pill small", "Profilo");
     prof.addEventListener("click", openProfile);
-    ui.bar.append(upd, paste, prof);
+    const acts = h("div", "cc-actions");
+    acts.append(upd, paste, prof);
+    ui.bar.appendChild(acts);
   }
 
   function render() {

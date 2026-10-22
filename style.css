@@ -167,6 +167,7 @@ body.focusing .zone[data-zone="relax"] { opacity: .32; }
 .pill.primary { background: var(--gold); color: #1A1406; border-color: var(--gold); min-width: 130px; }
 .focus-count { color: var(--muted); font-size: 13px; }
 .bottombar button { padding: 7px 16px; border-radius: 999px; background: var(--card); border: 1px solid var(--line); color: var(--muted); font-size: 12px; letter-spacing: .04em; }
+.bottombar::before { content: ""; width: 32px; flex: none; }   /* bilancia il pulsante ⟳: i puntini restano al centro */
 .bottombar .sync-btn { width: 32px; height: 32px; padding: 0; display: grid; place-items: center; position: relative; }
 .sync-btn svg { width: 16px; height: 16px; }
 .sync-btn.pending { color: var(--gold); border-color: rgba(242,198,109,.5); }

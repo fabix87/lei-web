@@ -112,7 +112,14 @@
   .col-grid { grid-template-columns: repeat(3, 1fr); }
   .sec-col .sec-head { flex-wrap: wrap; }
   .col-search { order: 3; flex: 1 1 100%; }
-  .col-launch .cl-title { font-size: 22px; }
+  /* In verticale la colonna è più stretta: scritta e icone sulla stessa riga, riquadro basso che non si schiaccia */
+  .col-launch { flex: 0 0 auto; min-height: 0; flex-direction: row; align-items: center; gap: 12px; padding: 14px 16px; }
+  .col-launch .cl-title { font-size: 18px; letter-spacing: .14em; }
+  .col-launch .cl-icons { justify-content: space-between; }
+  .col-launch .cl-icons svg { width: 30px; height: 30px; }
+  /* L'ultima zona (Relax) si allunga fino in fondo, come Casa nella colonna sinistra */
+  .col-right .zones { flex: 1; }
+  .col-right .zones .zone:last-child { flex: 1; }
 }
 
 /* Lettura della copertina (OCR) */

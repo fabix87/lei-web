@@ -196,7 +196,9 @@
     crit.addEventListener("click", openCriteria);
     const upd = h("button", "pill small", "Aggiorna ricerca");
     upd.addEventListener("click", openUpdateInfo);
-    ui.bar.append(search, zone, paste, crit, upd);
+    const acts = h("div", "cc-actions");
+    acts.append(paste, crit, upd);
+    ui.bar.append(search, zone, acts);
   }
 
   function ranked() {
