@@ -284,7 +284,7 @@
   }
 
   // ---------- Pannelli ----------
-  function closeSheet() { ui.sheet.hidden = true; ui.sheet.innerHTML = ""; }
+  function closeSheet() { if (!ui.sheet) return; ui.sheet.hidden = true; ui.sheet.innerHTML = ""; }
   function sheet(title) {
     ui.sheet.innerHTML = "";
     const box = h("div", "sheet-box cc-box");

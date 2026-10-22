@@ -2,7 +2,7 @@
 // File dell'app: prima la rete (così gli aggiornamenti arrivano subito), se manca si usa la copia.
 // File grandi e fissi (lettura delle copertine): prima la copia.
 // L'archivio online (Supabase) e i cataloghi non passano di qui: ci pensa db.js con la sua copia locale.
-const CACHE = "lei-web-20261022-170736";
+const CACHE = "lei-web-20261022-171136";
 const CORE = [
   "./", "index.html", "web.css", "style.css", "scrittura.css", "collection.css",
   "config.js", "core.js", "db.js", "sync.js", "sections.js", "allenamento.js", "dieta.js", "scrittura.js",

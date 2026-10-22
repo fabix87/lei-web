@@ -802,7 +802,7 @@
   }
 
   // ---------- Scheda prodotto (modifica o nuovo) ----------
-  function closeSheet() { ui.sheet.hidden = true; ui.sheet.innerHTML = ""; }
+  function closeSheet() { if (!ui.sheet) return; ui.sheet.hidden = true; ui.sheet.innerHTML = ""; }
   // prefill (prodotto nuovo): { found } da Open Food Facts, { barcode }, { name, photoBlob, results } dalla foto.
   // note: riga di spiegazione in alto.
   function openSheet(p, prefill, note) {

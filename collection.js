@@ -401,7 +401,7 @@
   }
 
   let sheetItem = null;
-  function closeSheet() { ui.sheet.hidden = true; ui.sheet.innerHTML = ""; sheetItem = null; }
+  function closeSheet() { if (!ui.sheet) return; ui.sheet.hidden = true; ui.sheet.innerHTML = ""; sheetItem = null; }
 
   function openSheet(src, message) {
     const it = Object.assign({}, src);     // si lavora su una copia: si salva solo con "Salva"

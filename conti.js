@@ -316,7 +316,7 @@
   }
 
   // ---------- Pannelli ----------
-  function closeSheet() { ui.sheet.hidden = true; ui.sheet.innerHTML = ""; }
+  function closeSheet() { if (!ui.sheet) return; ui.sheet.hidden = true; ui.sheet.innerHTML = ""; }   // senza accesso il pannello non c'è
 
   // PIN: creazione (prima volta), sblocco, cambio
   function showPin(change) {

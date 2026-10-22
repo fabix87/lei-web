@@ -26,23 +26,24 @@
   <div class="glow g2"></div>
 
   <main class="w-home">
-    <header class="w-top">
+    <!-- Come la Home del tablet in verticale: Oggi, i 6 progetti, Conti e Collection -->
+    <header class="card w-top">
       <div class="w-greeting" id="greeting">Ciao</div>
+      <div class="w-clock" id="clock">--:--</div>
       <div class="w-date" id="date"></div>
     </header>
 
-    <canvas id="wave" class="w-wave"></canvas>
-
     <nav class="w-grid">
-      <button class="w-card" data-sec="dieta" data-icon="leaf"><span class="w-icon"></span><span class="w-name">Dieta</span><span class="w-sub">Pasti di oggi, peso</span></button>
-      <button class="w-card" data-sec="allenamento" data-icon="dumbbell"><span class="w-icon"></span><span class="w-name">Allenamento</span><span class="w-sub">Scheda del giorno</span></button>
-      <button class="w-card" id="tileDispensa" data-sec="dispensa" data-icon="box"><span class="w-icon"></span><span class="w-name">Dispensa</span><span class="w-sub tile-sub">Cosa c'è in casa</span></button>
-      <button class="w-card" data-sec="conti" data-icon="wallet"><span class="w-icon"></span><span class="w-name">Conti</span><span class="w-sub">Pagamenti del mese e previsioni</span></button>
-      <button class="w-card" data-sec="scrittura" data-icon="pen"><span class="w-icon"></span><span class="w-name">Scrittura</span><span class="w-sub">Capitoli e note</span></button>
-      <button class="w-card" data-sec="collection" data-icon="discs"><span class="w-icon"></span><span class="w-name">Collection</span><span class="w-sub">Libri, dischi, film, giochi</span></button>
-      <button class="w-card" data-sec="casa" data-icon="house"><span class="w-icon"></span><span class="w-name">Cerca Casa</span><span class="w-sub">Case a Torino con punteggio</span></button>
-      <button class="w-card" data-sec="lavoro" data-icon="briefcase"><span class="w-icon"></span><span class="w-name">Cerca Lavoro</span><span class="w-sub">Annunci sul tuo profilo</span></button>
+      <button class="w-card" data-sec="dieta" data-icon="leaf"><span class="w-icon"></span><span class="w-name">Dieta</span></button>
+      <button class="w-card" data-sec="allenamento" data-icon="dumbbell"><span class="w-icon"></span><span class="w-name">Allenamento</span></button>
+      <button class="w-card" id="tileDispensa" data-sec="dispensa" data-icon="box"><span class="w-icon"></span><span class="w-name">Dispensa</span><span class="tile-sub" hidden></span></button>
+      <button class="w-card" data-sec="scrittura" data-icon="pen"><span class="w-icon"></span><span class="w-name">Scrittura</span></button>
+      <button class="w-card" data-sec="casa" data-icon="house"><span class="w-icon"></span><span class="w-name">Cerca Casa</span></button>
+      <button class="w-card" data-sec="lavoro" data-icon="briefcase"><span class="w-icon"></span><span class="w-name">Cerca Lavoro</span></button>
     </nav>
+
+    <button class="card col-launch" id="contiBtn"><span class="cl-title">Conti</span><span class="cl-icons"></span></button>
+    <button class="card col-launch" id="collectionBtn"><span class="cl-title">Collection</span><span class="cl-icons"></span></button>
 
     <footer class="w-sync">
       <span class="w-sync-state" id="syncState"></span>

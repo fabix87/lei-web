@@ -54,61 +54,13 @@
     refreshHome: () => { tick(); renderSync(); }
   };
 
-  // ---- Saluto e data ----
+  // ---- Saluto, ora e data ----
   function tick() {
     const now = new Date(), h = now.getHours();
     const saluto = h < 5 ? "Buonanotte" : h < 13 ? "Buongiorno" : h < 18 ? "Buon pomeriggio" : "Buonasera";
     $("#greeting").textContent = `${saluto}, ${C.name}`;
+    $("#clock").textContent = now.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
     $("#date").textContent = now.toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long" });
-  }
-
-  // ---- Onda di Samantha (solo decorativa) ----
-  const WAVES = [
-    { color: "242,198,109", alpha: 0.95, width: 2.2, freq: 1.6, speed: 0.9, phase: 0 },
-    { color: "242,198,109", alpha: 0.45, width: 1.2, freq: 2.3, speed: -1.3, phase: 1.7 },
-    { color: "63,169,184", alpha: 0.55, width: 1.4, freq: 1.1, speed: 0.6, phase: 3.1 },
-    { color: "234,242,244", alpha: 0.25, width: 1, freq: 3.1, speed: 1.8, phase: 4.4 }
-  ];
-  function setupWave() {
-    const cv = $("#wave"), ctx = cv.getContext("2d");
-    let running = true, last = 0;
-    function resize() {
-      const r = cv.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
-      cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
-    }
-    function frame(ms) {
-      if (!running) return;
-      requestAnimationFrame(frame);
-      if (ms - last < 33) return;
-      last = ms;
-      const w = cv.width, h = cv.height, t = ms / 1000, amp = h * 0.3;
-      ctx.clearRect(0, 0, w, h);
-      WAVES.forEach((wv, i) => {
-        ctx.beginPath();
-        for (let x = 0; x <= w; x += 4) {
-          const u = x / w, env = Math.pow(Math.sin(Math.PI * u), 2), breathe = 0.65 + 0.35 * Math.sin(t * 0.7 + i);
-          const y = h / 2 + Math.sin(u * Math.PI * 2 * wv.freq + t * wv.speed + wv.phase) * amp * env * breathe;
-          x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-        }
-        ctx.strokeStyle = `rgba(${wv.color},${wv.alpha})`;
-        ctx.lineWidth = wv.width * (window.devicePixelRatio || 1);
-        ctx.shadowColor = `rgba(${wv.color},0.6)`;
-        ctx.shadowBlur = 10;
-        ctx.stroke();
-      });
-      ctx.shadowBlur = 0;
-    }
-    resize();
-    window.addEventListener("resize", resize);
-    requestAnimationFrame(frame);
-    window.leiWave = {
-      pause: () => { running = false; },
-      resume: () => { if (!running) { running = true; requestAnimationFrame(frame); } }
-    };
-    document.addEventListener("visibilitychange", () => {
-      if (document.hidden) window.leiWave.pause();
-      else if (!window.LeiSections.isOpen()) window.leiWave.resume();
-    });
   }
 
   // ---- Pulsanti delle sezioni ----
@@ -162,8 +114,7 @@
 
   window.addEventListener("DOMContentLoaded", () => {
     tick();
-    setInterval(tick, 30000);
-    setupWave();
+    setInterval(tick, 10000);
     setupCards();
     setupSync();
     setupEdgeSwipe();
