@@ -107,12 +107,13 @@
 
   function setupPager() {
     const pager = $("#wPager"), dots = $("#wDots").children;
-    const home = () => { pager.scrollLeft = pager.clientWidth; };
-    home();
-    requestAnimationFrame(home);
-    window.addEventListener("resize", home);
+    let onDay = false;   // pagina mostrata: resta quella anche quando lo schermo cambia misura (tastiera, rotazione)
+    const place = () => { pager.scrollLeft = onDay ? 0 : pager.clientWidth; };
+    place();
+    requestAnimationFrame(place);
+    window.addEventListener("resize", place);
     pager.addEventListener("scroll", () => {
-      const onDay = pager.scrollLeft < pager.clientWidth / 2;
+      onDay = pager.scrollLeft < pager.clientWidth / 2;
       dots[0].classList.toggle("on", onDay);
       dots[1].classList.toggle("on", !onDay);
     }, { passive: true });
@@ -125,6 +126,16 @@
       $("#wdIcs").value = "";
       toast(window.LeiGiornata.linked ? "Calendario collegato" : "Salvato: il calendario arriverà alla prossima sincronizzazione");
       renderDay();
+    });
+    // Pulsante ⟳ della Giornata: rilegge subito il calendario
+    const rb = $("#wdRefresh");
+    rb.innerHTML = svg("sync");
+    rb.addEventListener("click", async () => {
+      rb.classList.add("spin");
+      const res = await window.LeiGiornata.refresh(true);
+      rb.classList.remove("spin");
+      renderDay();
+      toast({ ok: "Calendario aggiornato", nolink: "Collega prima Google Calendar (qui sotto)", errore: "Calendario non raggiungibile: resta l'ultima copia", accesso: "Accedi prima: apri una sezione e inserisci email e password" }[res] || "Aggiornato");
     });
     window.addEventListener("lei-giornata", renderDay);
     renderDay();

@@ -48,19 +48,24 @@
     try { const v = JSON.parse(window.Lei.upcomingEvents() || "[]"); return Array.isArray(v) ? v : []; } catch (e) { return []; }
   }
 
+  // Rilegge piano e calendario. Restituisce "ok", "nolink" (manca l'indirizzo iCal), "errore" (calendario non
+  // raggiungibile: resta l'ultima copia) o "accesso" (archivio non collegato).
   let refreshing = null;
   function refresh(force) {
     const DB = window.LeiDB;
-    if (refreshing || !DB || !DB.signedIn) return refreshing || Promise.resolve();
+    if (!DB || !DB.signedIn) return Promise.resolve("accesso");
+    if (refreshing) return refreshing;
     refreshing = (async () => {
-      let changed = false;
+      let changed = false, result = "ok";
       try {
         const rows = await DB.load(BLOCKS);
         if (JSON.stringify(rows) !== JSON.stringify(blocks)) { blocks = rows; store.set("blocks", rows); changed = true; }
       } catch (e) { }
       if (!bridge() && (force || Date.now() - events.at > EVENTS_EVERY)) {
         const j = await DB.fn("calendario");
+        if (!j || j.error) result = "errore";
         if (j && Array.isArray(j.events)) {
+          if (!j.linked) result = "nolink";
           if (j.linked !== linked) { linked = j.linked; store.set("linked", linked); changed = true; }
           if (!j.error || j.events.length) {
             changed = changed || JSON.stringify(j.events) !== JSON.stringify(events.list);
@@ -70,6 +75,7 @@
         }
       }
       if (changed) window.dispatchEvent(new Event("lei-giornata"));
+      return result;
     })().finally(() => { refreshing = null; });
     return refreshing;
   }
@@ -177,8 +183,7 @@
     get native() { return bridge(); }
   };
 
-  // Primo scaricamento appena l'archivio è pronto, poi a ogni sincronizzazione e al ritorno sull'app
+  // Primo scaricamento appena l'archivio è pronto e al ritorno sull'app; Sincronizza (sync.js) lo rifà subito
   window.addEventListener("DOMContentLoaded", () => setTimeout(() => refresh(), 400));
-  window.addEventListener("lei-synced", () => refresh(true));
   document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
 })();

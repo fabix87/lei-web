@@ -34,7 +34,10 @@
       if (!DB.online) return "Senza rete: riprova più tardi";
       try { localStorage.setItem(KEY, String(Date.now())); } catch (e) { }
       window.dispatchEvent(new Event("lei-synced"));   // le schermate rileggono i dati
-      return "Sincronizzato";
+      // Giornata: piano e calendario riletti subito (sull'iPhone il calendario arriva dall'indirizzo iCal)
+      const cal = window.LeiGiornata ? await window.LeiGiornata.refresh(true) : "ok";
+      if (cal === "errore") return "Sincronizzato · calendario non raggiungibile, resta l'ultima copia";
+      return window.LeiGiornata && !window.LeiGiornata.native && cal === "ok" ? "Sincronizzato · calendario aggiornato" : "Sincronizzato";
     })().finally(() => { running = null; });
     return running;
   }
