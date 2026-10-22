@@ -10,7 +10,7 @@
 .cc-bar .pill.small.gold { color: var(--acc); border-color: var(--acc); }
 .cc-bar .pill:disabled { opacity: .6; }
 .cc-search { flex: 1 1 200px; min-width: 0; }
-.cc-zone { flex: 0 1 180px; text-transform: none; letter-spacing: normal; color: var(--text); font-size: 15px; font-family: var(--light); }
+.cc-zonesel { flex: 0 1 180px; text-transform: none; letter-spacing: normal; color: var(--text); font-size: 15px; font-family: var(--light); }
 .cc-upd { margin-left: auto; }
 
 .cc-list { flex: 1; min-height: 0; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 10px; align-content: start; }

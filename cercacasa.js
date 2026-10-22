@@ -186,7 +186,7 @@
     search.placeholder = "Cerca una via…";
     search.value = query;
     search.addEventListener("input", () => { query = search.value; renderList(); });
-    const zone = h("select", "field cc-zone");
+    const zone = h("select", "field cc-zonesel");
     zone.appendChild(Object.assign(h("option", null, "Tutte le zone"), { value: "" }));
     ui.zoneSel = zone;
     zone.addEventListener("change", () => { zoneFilter = zone.value; renderList(); });

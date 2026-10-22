@@ -187,8 +187,8 @@
     ui.sub = head.querySelector(".sec-sub");
     ui.sync = head.querySelector(".sec-sync");
     ui.tabs = h("div", "sec-tabs");
-    TABS.forEach(([id]) => {
-      const b = h("button", "pill small");
+    TABS.forEach(([id, label]) => {
+      const b = h("button", "pill small", label);
       b.dataset.tab = id;
       b.addEventListener("click", () => { tab = id; render(); });
       ui.tabs.appendChild(b);
