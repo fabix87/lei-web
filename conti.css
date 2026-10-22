@@ -9,7 +9,7 @@
 .fn-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
 .fn-kpi { padding: 10px 14px; }
 .fn-kpi-l { font-size: 10px; text-transform: uppercase; letter-spacing: .14em; color: var(--muted); }
-.fn-kpi-v { font-family: var(--thin); font-size: 26px; font-variant-numeric: tabular-nums; margin-top: 2px; }
+.fn-kpi-v { font-family: var(--thin); font-size: 26px; white-space: nowrap; font-variant-numeric: tabular-nums; margin-top: 2px; }
 .fn-kpi-n { font-size: 11px; color: var(--muted); margin-top: 2px; line-height: 1.35; }
 .fn-kpi.good .fn-kpi-v { color: var(--good); }
 .fn-kpi.warn .fn-kpi-v { color: var(--warn); }
@@ -93,9 +93,13 @@
 .fn-upbox .field { width: 100%; }
 
 @media (orientation: portrait) {
+  .fn-kpis { grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); }
+  .fn-kpi { padding: 10px 12px; }
+  .fn-kpi-v { font-size: 21px; }
   .fn-sgrid { grid-template-columns: 1fr; }
   .fn-cat { grid-template-columns: 130px 1fr 70px; }
 }
 
 /* Pulsante "Conti" della Home del tablet: colonna sinistra fra Oggi e Casa (simmetrico a COLLECTION) */
 #contiBtn .cl-icons { color: #5FB9C4; }
+@media (orientation: portrait) { #contiBtn .cl-icons { justify-content: flex-end; gap: 22px; } }
