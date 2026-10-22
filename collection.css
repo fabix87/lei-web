@@ -59,7 +59,10 @@
 
 /* Scheda */
 .col-sheet { z-index: 30; }
-.col-box { width: min(880px, 94%); max-height: 92%; flex-direction: row; gap: 20px; overflow-y: auto; }
+.col-box { width: min(880px, 94%); max-height: 92%; flex-direction: row; gap: 20px; overflow-y: auto; position: relative; }
+.col-close { position: absolute; top: 12px; right: 12px; z-index: 2; width: 40px; height: 40px; border-radius: 50%;
+  background: var(--card); border: 1px solid var(--line); color: var(--muted); font-size: 16px; display: grid; place-items: center; }
+.col-close:active { background: var(--card-press); }
 .col-box-left { flex: 0 0 200px; display: flex; flex-direction: column; gap: 10px; align-items: stretch; }
 .col-box-cover .col-cover { border-radius: 10px; }
 .col-box-right { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px; }

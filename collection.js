@@ -123,7 +123,12 @@
   }
   let quotaHit = false;   // Google Books ha risposto "limite giornaliero raggiunto" (429)
   async function getJSON(url) {
-    const r = await http(url);
+    let r = await http(url);
+    // Google Books risponde spesso "503 backendFailed" (guasto suo, non della chiave): si riprova due volte
+    for (let i = 1; i <= 2 && r.status === 503 && /googleapis/.test(url); i++) {
+      await new Promise(res => setTimeout(res, 700 * i));
+      r = await http(url);
+    }
     if (r.status === 429 && /googleapis/.test(url)) quotaHit = true;
     if (r.status < 200 || r.status >= 300) return null;
     try { return JSON.parse(r.body); } catch (e) { return null; }
@@ -463,6 +468,11 @@
     sheetItem = { it, src };
     ui.sheet.innerHTML = "";
     const box = h("div", "sheet-box col-box");
+    // X in alto a destra: chiude la scheda senza salvare (come toccare fuori)
+    const x = h("button", "col-close", "✕");
+    x.setAttribute("aria-label", "Chiudi");
+    x.addEventListener("click", closeSheet);
+    box.appendChild(x);
     const left = h("div", "col-box-left");
     const right = h("div", "col-box-right");
     box.append(left, right);
