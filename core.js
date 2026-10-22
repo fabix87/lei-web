@@ -83,10 +83,12 @@
     const today = G.day(0);
     chips($("#wdChips"), today.allDay);
     G.render($("#wdTimeline"), { items: today.items });
-    // Domani: la giornata intera (impegni, pasti, allenamento) nel riquadro che arriva fino in fondo
+    // Domani: solo gli impegni del calendario, tutti, nel riquadro che arriva fino in fondo
     const tomorrow = G.day(1);
     chips($("#wdTomorrowChips"), tomorrow.allDay);
-    G.render($("#wdTomorrow"), { items: tomorrow.items, offset: 1 });
+    G.render($("#wdTomorrow"), { items: tomorrow.items.filter(it => it.kind === "event"), offset: 1 });
+    const empty = $("#wdTomorrow .tl-empty");
+    if (empty) empty.textContent = tomorrow.allDay.length ? "Nessun altro impegno" : "Nessun impegno";
     $("#wdLink").hidden = G.linked !== false;
 
     const list = $("#wMemoList");
