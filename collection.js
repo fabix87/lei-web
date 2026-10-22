@@ -128,8 +128,28 @@
     if (r.status < 200 || r.status >= 300) return null;
     try { return JSON.parse(r.body); } catch (e) { return null; }
   }
-  // Chiave Google Books personale e gratuita (config.js → collection.googleBooksKey): quota solo tua
-  const gbKey = () => { const k = ((window.LEI_CONFIG || {}).collection || {}).googleBooksKey; return k ? "&key=" + encodeURIComponent(k) : ""; };
+  // Chiave Google Books personale e gratuita: quota solo tua. Sta nell'archivio privato (settings 'googleBooksKey'),
+  // mai nel codice (la web app è pubblica); copia in localStorage per usarla subito. Le richieste a Google partono
+  // dal telefono o dal tablet: dal server di Supabase Google risponde spesso "503".
+  let gbUserKey = (() => { try { return localStorage.getItem("lei.col.gbkey") || ""; } catch (e) { return ""; } })();
+  async function loadGbKey() {
+    try {
+      const r = await DB.load("settings?key=eq.googleBooksKey&select=value");
+      gbUserKey = (r && r[0] && r[0].value) || "";
+      try { localStorage.setItem("lei.col.gbkey", gbUserKey); } catch (e) { }
+    } catch (e) { }
+  }
+  async function askGbKey() {
+    const k = (window.prompt("Incolla la chiave Google Books (inizia con AIza). Resta nel tuo archivio privato.") || "").trim();
+    if (!k) return false;
+    if (!/^AIza[0-9A-Za-z_-]{30,}$/.test(k)) { K.toast("Non sembra una chiave Google (inizia con AIza…)"); return false; }
+    gbUserKey = k;
+    try { localStorage.setItem("lei.col.gbkey", k); } catch (e) { }
+    DB.save("settings", { key: "googleBooksKey", value: k }, "user_id,key");
+    K.toast("Chiave salvata: cerco la copertina");
+    return true;
+  }
+  const gbKey = () => { const k = ((window.LEI_CONFIG || {}).collection || {}).googleBooksKey || gbUserKey; return k ? "&key=" + encodeURIComponent(k) : ""; };
   const notFoundMsg = () => quotaHit
     ? "Il catalogo Google ha raggiunto il limite di oggi: completa tu i dati o riprova più tardi"
     : "Non l'ho trovato online: completa tu i dati";
@@ -170,7 +190,10 @@
     const o = ol && ol["ISBN:" + isbn];
     const s = sbnRecord(srv && srv.sbn, isbn) || sbnRecord(sbnDirect, isbn);
     if (!v && !o && !s) return null;
-    const gbCover = v && v.imageLinks && (v.imageLinks.thumbnail || v.imageLinks.smallThumbnail);
+    let gbCover = v && v.imageLinks && (v.imageLinks.thumbnail || v.imageLinks.smallThumbnail);
+    // Libri appena usciti: Google spesso non li trova per ISBN. Si cerca per titolo e autore (da SBN) e si prende la
+    // copertina solo se coincide l'ISBN o, almeno, titolo e cognome dell'autore.
+    if (!gbCover && !(o && o.cover) && s && s.title && gbKey()) gbCover = await coverByTitle(s, isbn);
     return {
       title: (v && (v.title + (v.subtitle ? ": " + v.subtitle : ""))) || (s && s.title) || (o && o.title) || "",
       creator: (v && v.authors && v.authors.join(", ")) || (s && s.creator) || (o && o.authors && o.authors.map(a => a.name).join(", ")) || "",
@@ -181,6 +204,16 @@
       cover_url: (o && o.cover && (o.cover.large || o.cover.medium)) ||
         (gbCover ? gbCover.replace("http:", "https:").replace("&edge=curl", "") : null) || (srv && srv.cover) || null
     };
+  }
+
+  async function coverByTitle(s, isbn) {
+    const surname = norm(s.creator.split(" ").pop());
+    const q = `intitle:"${s.title.split(":")[0]}"` + (surname ? ` inauthor:${surname}` : "");
+    const j = await getJSON(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=10${gbKey()}`);
+    const list = ((j && j.items) || []).filter(x => x.volumeInfo && x.volumeInfo.imageLinks);
+    const same = x => norm(x.volumeInfo.title) === norm(s.title.split(":")[0]) && (!surname || norm((x.volumeInfo.authors || []).join(" ")).includes(surname));
+    const hit = list.find(x => (x.volumeInfo.industryIdentifiers || []).some(i => i.identifier === isbn)) || list.find(same);
+    return hit ? (hit.volumeInfo.imageLinks.thumbnail || hit.volumeInfo.imageLinks.smallThumbnail) : null;
   }
 
   // want: titolo letto dalla copertina. Se c'è, chiede più risultati e tiene quello col titolo più simile (non il primo)
@@ -441,6 +474,17 @@
     const shot = h("button", "pill small", "Fotografa copertina");
     shot.addEventListener("click", () => openScanner({ mode: "photo", onPhoto: (blob, url) => { it._blob = blob; it._preview = url; redrawCover(); } }));
     left.append(coverWrap, shot);
+    // Libro senza copertina e senza chiave Google personale: proposta di inserirla (una volta sola)
+    if (it.kind === "libro" && !gbKey() && !it.cover_url && !it.cover_path && !it._preview) {
+      const kb = h("button", "pill small", "Copertine da Google");
+      kb.addEventListener("click", async () => {
+        if (!(await askGbKey())) return;
+        kb.remove();
+        const f = ui.sheet.querySelector(".col-find");
+        if (f) f.click();
+      });
+      left.appendChild(kb);
+    }
     if (it.barcode) left.appendChild(h("div", "col-code", (isIsbn(it.barcode) ? "ISBN " : "Codice ") + it.barcode));
 
     if (message) right.appendChild(h("div", "col-msg", message));
@@ -470,7 +514,7 @@
     const titleRow = h("div", "col-row");
     const title = field("title", "Titolo");
     titleRow.appendChild(title);
-    const find = h("button", "pill small", "Cerca online");
+    const find = h("button", "pill small col-find", "Cerca online");
     find.addEventListener("click", async () => {
       const byIsbn = it.kind !== "disco" && isIsbn(String(it.barcode || ""));
       if (!it.title.trim() && !byIsbn) { K.toast("Scrivi prima il titolo"); return; }
@@ -1048,6 +1092,7 @@
       render();
       loadPhotos();
       refresh();
+      loadGbKey();
     },
     close() {
       cancelOcr();
