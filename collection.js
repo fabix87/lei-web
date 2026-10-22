@@ -248,7 +248,8 @@
     const out = [];
     const sbn = (srv && srv.sbn) || sd;
     ((sbn && sbn.briefRecords) || []).forEach(r => { const c = sbnRecord({ briefRecords: [r] }, isbn); if (c) out.push(Object.assign({ src: "SBN (biblioteche)" }, c)); });
-    [gi, srv && srv.google, gt].forEach(j => ((j && j.items) || []).forEach(x => out.push(gbCandidate(x))));
+    [gi, srv && srv.google].forEach(j => ((j && j.items) || []).forEach(x => out.push(gbCandidate(x))));
+    ((gt && gt.items) || []).forEach(x => out.push(Object.assign(gbCandidate(x), { byTitle: true })));
     const o = oi && oi["ISBN:" + isbn];
     if (o) out.push({
       src: "Open Library", title: o.title || "", creator: (o.authors || []).map(a => a.name).join(", "),
@@ -256,12 +257,14 @@
       pages: o.number_of_pages || null, cover_url: o.cover ? (o.cover.large || o.cover.medium) : null
     });
     ((os && os.docs) || []).forEach(d => out.push({
-      src: "Open Library", title: d.title + (d.subtitle ? ": " + d.subtitle : ""), creator: (d.author_name || []).join(", "),
+      src: "Open Library", byTitle: true, title: d.title + (d.subtitle ? ": " + d.subtitle : ""), creator: (d.author_name || []).join(", "),
       publisher: (d.publisher || [])[0] || "", year: d.first_publish_year || null, pages: d.number_of_pages_median || null,
       cover_url: d.cover_i ? `https://covers.openlibrary.org/b/id/${d.cover_i}-L.jpg` : null
     }));
     const seen = new Set();   // doppioni: stessi dati e stessa copertina
-    return out.filter(c => {
+    // Dalle ricerche per titolo solo i libri con almeno metà delle parole del titolo (niente risultati a caso)
+    const close = c => !c.byTitle || !t || similarity(t, c.title) >= 0.5 || similarity(t, t) === 0;
+    return out.filter(close).filter(c => {
       const k = [c.src, norm(c.title), norm(c.creator), norm(c.publisher), c.year, c.cover_url].join("|");
       if (!c.title || seen.has(k)) return false;
       seen.add(k);
