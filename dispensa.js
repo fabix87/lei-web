@@ -22,7 +22,7 @@
   const qty = (n, u) => `${String(Math.round(Number(n) * 100) / 100).replace(".", ",")} ${u}`;
 
   const SHOP = "shopping_items?deleted_at=is.null&select=id,name,amount,done,source,created_at&order=created_at";
-  const SOURCE_LABEL = { mano: "", ricetta: "per le ricette", finito: "finito", scaduto: "scaduto" };
+  const SOURCE_LABEL = { mano: "", ricetta: "per le ricette", finito: "finito", scaduto: "scaduto", standard: "standard" };
   let root = null, ui = {}, data = null, tab = "prodotti", photos = {};
   let cat = null;            // categoria aperta (null = griglia 3×3 delle categorie)
   // Colonne aggiunte dopo: category (08_categoria_prodotti.sql), nutrition (09_valori_nutrizionali.sql).
@@ -57,7 +57,14 @@
     blocks.forEach(b => (meals[b.day] = meals[b.day] || []).push(b));
     // Lista della spesa: null se la tabella non c'è ancora (06_lista_spesa.sql non eseguito)
     const shopping = await get(SHOP).catch(() => null);
-    return { products, pools, meals, shopping };
+    // Spesa standard (settings 'spesaStandard', 14_spesa_standard.sql) e "per vivere" del mese dai Conti, per il budget
+    const [stdRows, month] = await Promise.all([
+      get("settings?key=eq.spesaStandard&select=value").catch(() => []),
+      get(`fin_months?month=eq.${monthKey()}&select=month,living`).catch(() => [])
+    ]);
+    let standard = null;
+    try { if (stdRows[0]) standard = JSON.parse(stdRows[0].value); } catch (e) { }
+    return { products, pools, meals, shopping, standard, living: month[0] ? Number(month[0].living) : null };
   }
 
   async function refresh() {
@@ -543,7 +550,7 @@
     ui.sub = head.querySelector(".sec-sub");
     ui.sync = head.querySelector(".sec-sync");
     ui.tabs = h("div", "sec-tabs");
-    [["prodotti", "Prodotti"], ["ricette", "Ricette possibili"], ["fattibili", "Fattibili"], ["spesa", "Lista spesa"]].forEach(([id, label]) => {
+    [["prodotti", "Prodotti"], ["ricette", "Ricette possibili"], ["fattibili", "Fattibili"], ["spesa", "Lista spesa"], ["standard", "Spesa standard"]].forEach(([id, label]) => {
       const b = h("button", "pill small" + (id === tab ? " on" : ""), label);
       b.dataset.tab = id;
       b.addEventListener("click", () => { tab = id; render(); });
@@ -568,6 +575,7 @@
     if (tab === "prodotti") renderProducts();
     else if (tab === "ricette") renderRecipes();
     else if (tab === "fattibili") renderDoable();
+    else if (tab === "standard") renderStandard();
     else renderShopping();
   }
 
@@ -1169,6 +1177,228 @@
       c.appendChild(all);
     }
     side.appendChild(c);
+  }
+
+  // ---------- Spesa standard ----------
+  // Lista di riferimento (settings 'spesaStandard'): per ogni voce scorta piena e minima, parole per riconoscerla
+  // fra i prodotti e prezzo stimato (al mese per "mese" e "casa", a settimana per "settimana").
+  // Una voce va comprata quando quello che c'è in casa scende sotto la scorta minima: si riporta alla piena.
+  const STD_GROUPS = [["settimana", "Settimana"], ["mese", "Mese"], ["casa", "Casa e igiene"]];
+  const STD_HOME = { pulizia: "Pulizia", carta: "Carta", igiene: "Igiene personale" };
+  const WEEKS = 4.3;
+  let stdGroup = "settimana";
+  function monthKey() {
+    const t = new Date();
+    return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-01`;
+  }
+  const euro = n => `${(Math.round(n * 100) / 100).toFixed(2).replace(".", ",")} €`;
+  const euro0 = n => `${Math.round(n)} €`;
+  // Quanto di un prodotto c'è, nell'unità della voce (g, ml o pz); null se non si può convertire
+  function amountIn(p, unit) {
+    const q = Number(p.quantity) || 0;
+    if (unit === "pz") return p.unit === "pz" ? q : null;
+    const base = { g: "g", kg: "g", ml: "ml", l: "ml" }[p.unit];
+    if (base) return base === unit ? q * (p.unit === "kg" || p.unit === "l" ? 1000 : 1) : null;
+    const pack = packGrams(p);
+    return pack ? q * pack : null;
+  }
+  // Prodotti in casa che corrispondono alla voce: per parola (o frase) o per categoria, meno le parole escluse
+  function stdProducts(it) {
+    const words = [].concat(...(it.words || []).map(w => [norm(w)].concat(SYNONYMS[norm(w)] || []))), not = (it.not || []).map(norm);
+    return data.products.filter(p => {
+      if (Number(p.quantity) <= 0) return false;
+      const n = norm(p.name), tokens = n.split(/[^a-z]+/);
+      if (not.some(w => n.includes(w))) return false;
+      if (!words.length) return it.group !== "casa" && catOf(p).id === it.cat;   // es. "Pesce": tutta la categoria
+      return words.some(w => (w.includes(" ") ? n.includes(w) : tokens.some(t => sameWord(t, w))));
+    });
+  }
+  // Stato della voce: { have (null = non si sa quanto), found, buy, missing, cost }
+  function stdState(it) {
+    const found = stdProducts(it);
+    let have = 0;
+    for (const p of found) {
+      const a = amountIn(p, it.unit);
+      if (a === null) { have = null; break; }
+      have += a;
+    }
+    const tracked = found.length > 0;
+    // Casa e igiene: se non è registrata in Dispensa si controlla a occhio (non entra da sola nella lista)
+    const buy = tracked ? have !== null && have < it.min : it.group !== "casa";
+    const missing = tracked && have !== null ? Math.max(0, it.full - have) : it.full;
+    const cost = buy ? it.price * Math.min(1, missing / it.full) : 0;
+    return { found, have: tracked ? have : 0, tracked, buy, missing, cost };
+  }
+  function stdQty(n, unit) {
+    if (unit === "g" && n >= 1000) return qty(n / 1000, "kg");
+    if (unit === "ml" && n >= 1000) return qty(n / 1000, "l");
+    return qty(Math.round(n), unit);
+  }
+  const shopOf = g => (data.standard.shops || {})[g] || "";
+  // Testo da mettere nella lista della spesa: quanto manca (o l'etichetta della voce) e dove
+  function stdAmount(it, st) {
+    const q = st.tracked && st.have !== null && st.have > 0 ? stdQty(st.missing, it.unit) : it.label;
+    return [q, shopOf(it.group)].filter(Boolean).join(" · ");
+  }
+  function addStd(it, st) {
+    if (inList(it.name)) return;
+    addItem(it.name, stdAmount(it, st), "standard");
+  }
+  // Costo della lista standard in un mese: mese + settimana × 4,3 + casa, più il margine
+  function stdMonthly(std) {
+    const sum = g => std.items.filter(i => i.group === g).reduce((s, i) => s + (Number(i.price) || 0), 0);
+    const base = sum("mese") + sum("settimana") * WEEKS + sum("casa");
+    return { base, withMargin: base * (1 + (std.margin || 0)), week: sum("settimana") };
+  }
+  function saveStandard() {
+    DB.save("settings", { key: "spesaStandard", value: JSON.stringify(data.standard) }, "user_id,key");
+  }
+
+  function renderStandard() {
+    const std = data.standard;
+    if (!std || !Array.isArray(std.items)) {
+      ui.body.appendChild(h("div", "sec-empty", "La spesa standard non è ancora nell'archivio: va eseguito il file 14_spesa_standard.sql su Supabase."));
+      return;
+    }
+    const main = h("div", "card sp-main st-main"), side = h("div", "wk-side");
+    ui.body.append(main, side);
+
+    // Schede: Settimana (Ekom), Mese (Lidl), Casa e igiene (Lidl)
+    const bar = h("div", "st-bar");
+    STD_GROUPS.forEach(([id, label]) => {
+      const b = h("button", "pill small" + (id === stdGroup ? " on" : ""), label + (shopOf(id) ? " · " + shopOf(id) : ""));
+      b.addEventListener("click", () => { stdGroup = id; render(); });
+      bar.appendChild(b);
+    });
+    main.appendChild(bar);
+
+    const items = std.items.filter(i => i.group === stdGroup);
+    const states = new Map(items.map(i => [i, stdState(i)]));
+    const toBuy = items.filter(i => states.get(i).buy && !inList(i.name));
+    const head = h("div", "st-head");
+    const per = stdGroup === "settimana" ? "a settimana" : "al mese";
+    head.appendChild(h("div", "wk-hint", toBuy.length
+      ? `Da comprare: ${toBuy.length} · circa ${euro(toBuy.reduce((s, i) => s + states.get(i).cost, 0))}`
+      : "Hai tutto quello che serve"));
+    if (toBuy.length) {
+      const all = h("button", "pill small primary", "Metti in lista");
+      all.addEventListener("click", () => { toBuy.forEach(i => addStd(i, states.get(i))); K.toast(`${toBuy.length} voci nella lista della spesa`); });
+      head.appendChild(all);
+    }
+    main.appendChild(head);
+
+    // Voci per categoria (cibo) o per tipo (casa)
+    const groups = [];
+    items.forEach(i => {
+      let g = groups.find(x => x.id === i.cat);
+      if (!g) groups.push(g = { id: i.cat, items: [] });
+      g.items.push(i);
+    });
+    groups.forEach(g => {
+      const c = CAT.LIST.find(x => x.id === g.id);
+      const gh = h("h2", "zone-h st-cat", c ? c.label : STD_HOME[g.id] || g.id);
+      if (c) gh.style.color = c.color;
+      main.appendChild(gh);
+      g.items.forEach(i => main.appendChild(stdRow(i, states.get(i), per)));
+    });
+    const addNew = h("button", "pill small st-new", "+ Nuova voce");
+    addNew.addEventListener("click", () => openStdSheet(null));
+    main.appendChild(addNew);
+
+    // Colonna: budget dai Conti e costo della lista standard
+    const m = stdMonthly(std);
+    const card = h("div", "card ds-side st-budget");
+    card.appendChild(h("h2", "zone-h", "Budget"));
+    const line = (label, val, cls) => { const r = h("div", "ds-side-row" + (cls ? " " + cls : "")); r.append(h("span", null, label), h("span", null, val)); card.appendChild(r); };
+    line("Lista standard al mese", "≈ " + euro0(m.base));
+    line(`Con il margine (${Math.round((std.margin || 0) * 100)}%)`, "≈ " + euro0(m.withMargin));
+    line("Freschi a settimana", "≈ " + euro0(m.week));
+    if (data.living !== null) {
+      const budget = data.living * (std.quota || 0);
+      const monthName = new Date().toLocaleDateString("it-IT", { month: "long" });
+      line(`Budget spesa di ${monthName}`, euro0(budget), "st-strong");
+      const diff = budget - m.withMargin;
+      card.appendChild(h("div", "wk-hint", `${Math.round((std.quota || 0) * 100)}% dei ${euro0(data.living)} "per vivere" nei Conti. ` +
+        (diff >= 0 ? `Avanzano circa ${euro0(diff)}.` : `Mancano circa ${euro0(-diff)}: il piano di questo mese non copre la lista intera.`)));
+    } else card.appendChild(h("div", "wk-hint", "Il budget del mese arriva dai Conti: qui non c'è ancora il mese in corso."));
+    card.appendChild(h("div", "wk-hint", "Prezzi stimati: correggili con gli scontrini toccando una voce."));
+    side.appendChild(card);
+  }
+
+  function stdRow(it, st, per) {
+    const r = h("div", "st-item" + (st.buy ? " buy" : ""));
+    const dot = h("span", "st-dot " + (st.buy ? "buy" : st.tracked ? "ok" : "unk"));
+    const body = h("button", "st-body");
+    body.appendChild(h("span", "sp-text", it.name));
+    let state;
+    if (!st.tracked) state = it.group === "casa" ? "non registrato: controlla a occhio" : "non c'è in casa";
+    else if (st.have === null) state = "c'è: " + st.found.slice(0, 2).map(p => `${p.name} ${qty(p.quantity, p.unit)}`).join(", ");
+    else state = `in casa ${stdQty(st.have, it.unit)}` + (st.buy ? ` · sotto ${stdQty(it.min, it.unit)}` : "");
+    body.appendChild(h("span", "sp-why", `${it.label} · ${state}`));
+    body.addEventListener("click", () => openStdSheet(it));
+    const price = h("span", "st-price", it.price ? euro(it.price) : "");
+    price.title = per;
+    r.append(dot, body, price);
+    if (inList(it.name)) r.appendChild(h("span", "wk-hint st-in", "in lista"));
+    else {
+      const plus = h("button", "sp-plus", "+");
+      plus.setAttribute("aria-label", "Metti nella lista della spesa");
+      plus.addEventListener("click", () => addStd(it, st));
+      r.appendChild(plus);
+    }
+    return r;
+  }
+
+  // Scheda di una voce: nome, quantità, prezzo, parole per riconoscerla; anche per aggiungerne una nuova
+  function openStdSheet(it) {
+    const isNew = !it;
+    const d = isNew ? { group: stdGroup, cat: stdGroup === "casa" ? "pulizia" : "comuni", name: "", words: [], unit: "pz", full: 1, min: 1, label: "", price: 0 } : Object.assign({}, it);
+    ui.sheet.innerHTML = "";
+    const box = h("div", "sheet-box ds-box st-box");
+    box.appendChild(h("h3", null, isNew ? "Nuova voce" : it.name));
+    const field = (label, input) => { const l = h("label", "st-field"); l.append(h("span", "wk-hint", label), input); box.appendChild(l); return input; };
+    const inp = (v, mode) => { const e = h("input", "field"); e.value = v; if (mode) e.inputMode = mode; return e; };
+    const num = s => { const n = parseFloat(String(s).replace(",", ".")); return isFinite(n) ? n : 0; };
+    const fmt = n => String(n).replace(".", ",");
+    const name = field("Nome", inp(d.name));
+    const label = field("Quanto (come lo leggi in lista)", inp(d.label));
+    const unit = h("select", "field");
+    [["g", "grammi"], ["ml", "millilitri"], ["pz", "pezzi o confezioni"]].forEach(([v, t]) => { const o = h("option", null, t); o.value = v; o.selected = d.unit === v; unit.appendChild(o); });
+    field("Si conta in", unit);
+    const full = field("Scorta piena (quanto riportarne a casa)", inp(fmt(d.full), "decimal"));
+    const min = field("Scorta minima (sotto si compra)", inp(fmt(d.min), "decimal"));
+    const price = field(d.group === "settimana" ? "Prezzo stimato a settimana (€)" : "Prezzo stimato al mese (€)", inp(fmt(d.price), "decimal"));
+    const words = field("Parole per riconoscerlo in Dispensa (separate da virgola)", inp((d.words || []).join(", ")));
+    if (!(d.words || []).length && d.cat && !isNew && d.group !== "casa") words.placeholder = "vuoto: tutti i prodotti della categoria";
+    const act = h("div", "row");
+    if (!isNew) {
+      const del = h("button", null, "Elimina");
+      del.addEventListener("click", () => {
+        data.standard.items = data.standard.items.filter(x => x !== it);
+        saveStandard(); closeSheet(); render();
+      });
+      act.appendChild(del);
+    }
+    const cancel = h("button", null, "Annulla"), ok = h("button", "primary", "Salva");
+    cancel.addEventListener("click", closeSheet);
+    ok.addEventListener("click", () => {
+      if (!name.value.trim()) return K.toast("Scrivi il nome");
+      Object.assign(d, {
+        name: name.value.trim(), label: label.value.trim(), unit: unit.value, full: num(full.value), min: num(min.value), price: num(price.value),
+        words: words.value.split(",").map(s => s.trim()).filter(Boolean)
+      });
+      if (isNew) {
+        d.id = "s" + Date.now().toString(36);
+        if (!d.words.length) d.words = [norm(d.name).split(/[^a-z]+/)[0]];
+        data.standard.items.push(d);
+      } else Object.assign(it, d);
+      saveStandard(); closeSheet(); render();
+    });
+    act.append(cancel, ok);
+    box.appendChild(act);
+    ui.sheet.appendChild(box);
+    ui.sheet.hidden = false;
+    name.focus && isNew && name.focus();
   }
 
   // ---------- Riquadri della pagina Cucina (Dispensa e Lista spesa) ----------

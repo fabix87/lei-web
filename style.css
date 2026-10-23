@@ -543,6 +543,27 @@ body.focusing .zone[data-zone="relax"] { opacity: .32; }
   .ds-spesa { grid-template-columns: 1fr; grid-template-rows: 1fr auto; }
   .ds-spesa .wk-side > * { max-height: 300px; }
 }
+/* Dispensa: spesa standard */
+.ds-standard { display: grid; grid-template-columns: 1.6fr 1fr; gap: 12px; }
+.st-bar { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+.st-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 4px 0 6px; }
+.st-cat { margin: 14px 0 2px; }
+.st-item { display: grid; grid-template-columns: 12px 1fr auto auto; gap: 10px; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--line); }
+.st-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); opacity: .5; }
+.st-dot.ok { background: var(--teal); opacity: 1; }
+.st-dot.buy { background: var(--gold); opacity: 1; }
+.st-body { display: flex; flex-direction: column; align-items: flex-start; text-align: left; min-width: 0; gap: 2px; }
+.st-price { color: var(--muted); font-size: 13px; white-space: nowrap; }
+.st-in { white-space: nowrap; }
+.st-new { margin-top: 12px; }
+.st-budget .st-strong { color: var(--gold); }
+.st-budget .wk-hint { margin-top: 8px; }
+.st-box { max-height: calc(100% - 24px); overflow-y: auto; }
+.st-field { display: flex; flex-direction: column; gap: 4px; }
+@media (orientation: portrait) {
+  .ds-standard { grid-template-columns: 1fr; grid-template-rows: 1fr auto; }
+  .ds-standard .wk-side > * { max-height: 300px; }
+}
 .lei-photo-frame { left: 50%; right: auto; top: 50%; width: min(80vw, 62vh); height: min(80vw, 62vh); transform: translate(-50%, -58%); }
 /* Dispensa: immagine del prodotto, proposte online e valori nutrizionali */
 .ds-ic-photo { background: #fff; overflow: hidden; }
